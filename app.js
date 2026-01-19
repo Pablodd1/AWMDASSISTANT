@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const vBP = document.getElementById('v-bp');
     const vSPO2 = document.getElementById('v-spo2');
     const syncWearablesBtn = document.getElementById('sync-wearables');
+    const clearDataBtn = document.getElementById('clear-data');
 
     // UI Elements - SOAP
     const soapDoc = document.getElementById('soap-document');
@@ -42,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatMessages = document.getElementById('chat-messages');
 
     const downloadWordBtn = document.getElementById('download-word');
+    const themeToggleBtn = document.getElementById('theme-toggle');
 
     // App State
     const savedState = localStorage.getItem('mediDocState');
@@ -286,6 +288,15 @@ document.addEventListener('DOMContentLoaded', () => {
         state.vitals = { hr: 62, hrv: 58, bp: "118/76", spo2: 99 };
         alert('Data synced from Oura/Apple Health (Mock)');
     });
+
+    if (clearDataBtn) {
+        clearDataBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all patient data? This cannot be undone.')) {
+                localStorage.removeItem('mediDocState');
+                location.reload();
+            }
+        });
+    }
 
     // --- Clinical Coding Logic ---
     addCodeBtn.addEventListener('click', () => {
@@ -548,63 +559,73 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Enhanced SOAP Generation ---
     function generateSOAP() {
         try {
-        // 1. Sync Patient Header
-        document.getElementById('soap-p-name').innerText = state.patient.name || 'Not Recorded';
-        document.getElementById('soap-p-dob').innerText = state.patient.dob || 'Not Recorded';
-        document.getElementById('soap-p-age').innerText = state.patient.age || '--';
-        document.getElementById('soap-p-sex').innerText = (document.getElementById('p-sex')?.value) || '--';
-        document.getElementById('soap-p-chart').innerText = state.patient.chart || 'AW-7742';
-        document.getElementById('soap-p-provider').innerText = state.patient.provider || 'Andre Bezerra, APRN';
-        document.getElementById('soap-footer-provider').innerText = state.patient.provider || 'Andre Bezerra, APRN';
+            // 1. Sync Patient Header
+            document.getElementById('soap-p-name').innerText = state.patient.name || 'Not Recorded';
+            document.getElementById('soap-p-dob').innerText = state.patient.dob || 'Not Recorded';
+            document.getElementById('soap-p-age').innerText = state.patient.age || '--';
+            document.getElementById('soap-p-sex').innerText = (document.getElementById('p-sex')?.value) || '--';
+            document.getElementById('soap-p-chart').innerText = state.patient.chart || 'AW-7742';
+            document.getElementById('soap-p-provider').innerText = state.patient.provider || 'Andre Bezerra, APRN';
+            document.getElementById('soap-footer-provider').innerText = state.patient.provider || 'Andre Bezerra, APRN';
 
-        // 2. Populate Clinical Sections
-        document.getElementById('soap-complaint').innerText = state.history.complaint || "Routine review of medical records.";
+            // 2. Populate Clinical Sections
+            document.getElementById('soap-complaint').innerText = state.history.complaint || "Routine review of medical records.";
 
-        const hpiText = document.getElementById('doctor-note').value;
-        document.getElementById('soap-hpi').innerText = hpiText || "Patient presents for a comprehensive review of laboratory results. Reports no acute complaints at this time. Denies fatigue, polyuria, polydipsia, weight changes, chest pain, shortness of breath, or abdominal pain.";
+            const hpiText = document.getElementById('doctor-note').value;
+            document.getElementById('soap-hpi').innerText = hpiText || "Patient presents for a comprehensive review of laboratory results. Reports no acute complaints at this time. Denies fatigue, polyuria, polydipsia, weight changes, chest pain, shortness of breath, or abdominal pain.";
 
-        document.getElementById('soap-medical-hx').innerText = state.history.medical || "1. HLH\n2. High Cholesterol\n3. HTN\n4. GERD\n5. Constipation\n6. Hearing Loss\n7. OA\n8. Anxiety";
-        document.getElementById('soap-surgical-hx').innerText = state.history.surgical || "1. Eye Surgery\n2. Excision of skin cancer\n3. Cholecystectomy\n4. R. Knee Replacement (2018)\n5. Carotid endarterectomy";
-        document.getElementById('soap-family-hx').innerText = state.history.family || "Non-contributory per patient report.";
-        document.getElementById('soap-social-hx').innerText = state.history.social || "Denies tobacco/illicit drug use.";
+            document.getElementById('soap-medical-hx').innerText = state.history.medical || "1. HLH\n2. High Cholesterol\n3. HTN\n4. GERD\n5. Constipation\n6. Hearing Loss\n7. OA\n8. Anxiety";
+            document.getElementById('soap-surgical-hx').innerText = state.history.surgical || "1. Eye Surgery\n2. Excision of skin cancer\n3. Cholecystectomy\n4. R. Knee Replacement (2018)\n5. Carotid endarterectomy";
+            document.getElementById('soap-family-hx').innerText = state.history.family || "Non-contributory per patient report.";
+            document.getElementById('soap-social-hx').innerText = state.history.social || "Denies tobacco/illicit drug use.";
 
-        // Dynamic Smoking Status based on Social Hx or explicit field
-        const social = state.history.social.toLowerCase();
-        let smokingStatus = "Never Smoker";
-        if (social.includes('smoke') || social.includes('tobacco')) smokingStatus = "Current Smoker / Tobacco User";
-        if (social.includes('former') || social.includes('quit')) smokingStatus = "Former Smoker";
-        document.getElementById('soap-smoking').innerText = smokingStatus;
+            // Dynamic Smoking Status based on Social Hx or explicit field
+            const social = state.history.social.toLowerCase();
+            let smokingStatus = "Never Smoker";
+            if (social.includes('smoke') || social.includes('tobacco')) smokingStatus = "Current Smoker / Tobacco User";
+            if (social.includes('former') || social.includes('quit')) smokingStatus = "Former Smoker";
+            document.getElementById('soap-smoking').innerText = smokingStatus;
 
-        document.getElementById('soap-allergies').innerText = state.history.allergies || "No Known Drug Allergies (NKDA).";
+            document.getElementById('soap-allergies').innerText = state.history.allergies || "No Known Drug Allergies (NKDA).";
 
-        // 3. Medications Table
-        const meds = state.entities.find(e => e.category === 'Medications Found')?.items || [];
-        const medsTable = document.getElementById('soap-meds-table');
-        if (meds.length) {
-            let html = `<table class="clinical-table"><thead><tr><th>Medication</th><th>Dose/Freq</th></tr></thead><tbody>`;
-            meds.forEach(m => html += `<tr><td>${m}</td><td>One Po Q Day</td></tr>`);
-            html += `</tbody></table>`;
-            medsTable.innerHTML = html;
-        } else {
-            // Default clinical example if nothing found
-            medsTable.innerHTML = `<table class="clinical-table"><thead><tr><th>Medication</th><th>Dose/Freq</th></tr></thead><tbody>
-                <tr><td>Potassium Chloride Crys Er 10MEQ</td><td>One Po Q Day</td></tr>
-                <tr><td>Azithromycin 250MG Tablet</td><td>Take 2 Tabs Po X 1, Then 1 Tab Daily X4 Days</td></tr>
-                <tr><td>Metformin Hcl 500MG Tablet</td><td>1 Bid</td></tr>
-                <tr><td>Atenolol 25MG Tablet</td><td>1 Po Q Am at T</td></tr>
-            </tbody></table>`;
-        }
+            // 3. Medications Table
+        const meds = (state.entities || []).find(e => e.category === 'Medications Found')?.items || [];
+            const medsTable = document.getElementById('soap-meds-table');
+            if (meds.length) {
+                let html = `<table class="clinical-table"><thead><tr><th>Medication</th><th>Dose/Freq</th></tr></thead><tbody>`;
+                meds.forEach(m => html += `<tr><td>${m}</td><td>One Po Q Day</td></tr>`);
+                html += `</tbody></table>`;
+                medsTable.innerHTML = html;
+            } else {
+                // Default clinical example if nothing found
+                medsTable.innerHTML = `<table class="clinical-table"><thead><tr><th>Medication</th><th>Dose/Freq</th></tr></thead><tbody>
+                    <tr><td>Potassium Chloride Crys Er 10MEQ</td><td>One Po Q Day</td></tr>
+                    <tr><td>Azithromycin 250MG Tablet</td><td>Take 2 Tabs Po X 1, Then 1 Tab Daily X4 Days</td></tr>
+                    <tr><td>Metformin Hcl 500MG Tablet</td><td>1 Bid</td></tr>
+                    <tr><td>Atenolol 25MG Tablet</td><td>1 Po Q Am at T</td></tr>
+                </tbody></table>`;
+            }
 
-        // 4. Assessment (ICD Codes)
-        renderCodes();
+            // 4. Assessment (ICD Codes)
+            renderCodes();
 
-        // 5. Plan & Synthesis
-        document.getElementById('assessment-plan').innerHTML = performFunctionalSynthesis();
+            // 5. Plan & Synthesis
+            document.getElementById('assessment-plan').innerHTML = performFunctionalSynthesis();
 
-        // 6. Partition Recommendations
-        renderStructuredRecommendations();
+            // 6. Partition Recommendations - NOW USING THE CARD-BASED GENERATOR
+            const recsHtml = generateRecommendations();
 
-        // 7. Health Maintenance
+            // Distribute to sections based on content to simulate partitioning,
+            // or just dump it all in "Lifestyle" if that's easier, but let's try to be smart.
+            // Since generateRecommendations returns one big blob, we'll put it in Lifestyle
+            // and clear the others to avoid duplication or confusion.
+            document.getElementById('soap-lifestyle').innerHTML = recsHtml;
+            document.getElementById('peptide-content').innerHTML = ''; // Cleared as included in recsHtml
+            document.getElementById('soap-supplements').innerHTML = ''; // Cleared as included in recsHtml
+            document.getElementById('soap-monitoring').innerHTML = ''; // Cleared as included in recsHtml
+            document.getElementById('soap-education').innerHTML = ''; // Cleared as included in recsHtml
+
+            // 7. Health Maintenance
         const maintenanceTable = document.getElementById('soap-maintenance-rows');
         maintenanceTable.innerHTML = `
             <tr><td>Influenza Vaccine</td><td>02/07/2016</td><td>02/07/2017</td><td>Performed</td></tr>
@@ -824,7 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis += `<p>✅ All extracted biomarkers appear within optimal functional ranges.</p>`;
         } else {
             // No labs found logic
-            const raw = state.rawText.toLowerCase();
+            const raw = (state.rawText || '').toLowerCase();
             if (raw.length > 0 && !raw.includes('blood') && !raw.includes('lab')) {
                 analysis += `<p><em>No blood biomarkers detected in the provided text. Please ensure lab results are clearly visible.</em></p>`;
             }
@@ -868,7 +889,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function generateRecommendations() {
         let html = '';
-        const raw = state.rawText.toLowerCase();
+        const raw = (state.rawText || '').toLowerCase();
         const labs = state.labs || {};
 
         // 1. Diagnostic & Labs (Biller Focused)
@@ -995,6 +1016,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const matches = text.match(icd10Regex) || [];
         return [...new Set(matches)].map(code => ({ code, desc: 'Extracted from document' }));
     }
+
+    // --- Theme Toggle Logic ---
+    themeToggleBtn.addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        const isDark = document.body.classList.contains('dark-mode');
+        themeToggleBtn.innerText = isDark ? '☀️' : '🌗';
+
+        // Dynamic styles for Dark Mode (minimal implementation)
+        if (isDark) {
+            document.documentElement.style.setProperty('--bg-page', '#0f172a');
+            document.documentElement.style.setProperty('--bg-panel', '#1e293b');
+            document.documentElement.style.setProperty('--text-main', '#f1f5f9');
+            document.documentElement.style.setProperty('--text-muted', '#94a3b8');
+            document.documentElement.style.setProperty('--border-light', '#334155');
+        } else {
+            document.documentElement.style.setProperty('--bg-page', '#f8fafc');
+            document.documentElement.style.setProperty('--bg-panel', '#ffffff');
+            document.documentElement.style.setProperty('--text-main', '#1e293b');
+            document.documentElement.style.setProperty('--text-muted', '#64748b');
+            document.documentElement.style.setProperty('--border-light', '#e2e8f0');
+        }
+    });
 
     // --- Export Logic ---
     printBtn.addEventListener('click', () => window.print());
