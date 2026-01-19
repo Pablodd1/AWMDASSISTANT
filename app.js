@@ -23,6 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const downloadPdfBtn = document.getElementById('download-pdf');
 
     const addCodeBtn = document.getElementById('add-code-btn');
+    const codeList = document.getElementById('code-list');
+    const newCodeInput = document.getElementById('new-code');
+    const newCodeDescInput = document.getElementById('new-code-desc');
     const statusText = document.getElementById('status-text') || { textContent: '' }; // Fallback
 
     // UI Elements - Voice
@@ -54,12 +57,85 @@ document.addEventListener('DOMContentLoaded', () => {
             complaint: ''
         },
         entities: [],
+        labs: {}, // Store extracted numerical lab values
         vitals: { hr: 65, hrv: 45, bp: '120/80', spo2: 98 },
         codes: [
             { code: 'Z00.00', desc: 'Encounter for general adult medical examination', justification: 'Standard baseline assessment code.' }
         ],
         analysis: null
     };
+
+    // --- Functional Medicine Logic ---
+    const FUNCTIONAL_RANGES = {
+        tsh: { min: 1.0, max: 2.5, unit: 'mIU/L', label: 'Thyroid (TSH)', low: "Hyperthyroid Pattern", high: "Subclinical Hypothyroid Pattern" },
+        vit_d: { min: 50, max: 80, unit: 'ng/mL', label: 'Vitamin D (25-OH)', low: "Suboptimal (<50)", high: "Potential Toxicity" },
+        hba1c: { min: 4.5, max: 5.3, unit: '%', label: 'HbA1c', low: "Hypoglycemia Risk", high: "Insulin Resistance (>5.3)" },
+        hdl: { min: 55, max: 100, unit: 'mg/dL', label: 'HDL Cholesterol', low: "Metabolic Risk", high: "Optimal" },
+        ldl: { min: 0, max: 100, unit: 'mg/dL', label: 'LDL Cholesterol', low: "Optimal", high: "Atherogenic Risk (>100)" },
+        trig: { min: 0, max: 80, unit: 'mg/dL', label: 'Triglycerides', low: "Optimal", high: "Carbohydrate Intolerance (>80)" },
+        ferritin: { min: 50, max: 150, unit: 'ng/mL', label: 'Ferritin', low: "Iron Insufficiency", high: "Inflammation/Overload" },
+        b12: { min: 500, max: 1200, unit: 'pg/mL', label: 'Vitamin B12', low: "Methylation Deficit", high: "Optimal" },
+        crp: { min: 0, max: 1.0, unit: 'mg/L', label: 'hs-CRP', low: "Optimal", high: "Systemic Inflammation" },
+        magnesium: { min: 5.0, max: 7.0, unit: 'mg/dL', label: 'RBC Magnesium', low: "Deficiency", high: "Optimal" },
+        homocysteine: { min: 0, max: 7.0, unit: 'umol/L', label: 'Homocysteine', low: "Optimal", high: "Methylation Issue" }
+    };
+
+    function extractLabValues(text) {
+        const extracted = {};
+        const t = text.replace(/\n/g, " "); // Flatten for regex
+
+        const patterns = {
+            tsh: /(?:TSH|Thyroid Stimulating Hormone)[^\d]*(\d+\.?\d*)/i,
+            vit_d: /(?:Vitamin D|Vit D|25-OH)[^\d]*(\d{2,3})/i,
+            hba1c: /(?:HbA1c|Hemoglobin A1c)[^\d]*(\d\.?\d?)/i,
+            hdl: /(?:HDL|High Density Lipoprotein)[^\d]*(\d{2,3})/i,
+            ldl: /(?:LDL|Low Density Lipoprotein)[^\d]*(\d{2,3})/i,
+            trig: /(?:Triglycerides|Trigs)[^\d]*(\d{2,3})/i,
+            ferritin: /Ferritin[^\d]*(\d{1,3})/i,
+            b12: /(?:Vitamin B12|B12|Cobalamin)[^\d]*(\d{3,4})/i,
+            crp: /(?:CRP|C-Reactive Protein)[^\d]*(\d+\.?\d*)/i,
+            homocysteine: /Homocysteine[^\d]*(\d+\.?\d*)/i
+        };
+
+        for (const [key, regex] of Object.entries(patterns)) {
+            const match = t.match(regex);
+            if (match && match[1]) {
+                extracted[key] = parseFloat(match[1]);
+            }
+        }
+        return extracted;
+    }
+
+    function analyzeBiomarkers(labs) {
+        const insights = [];
+
+        for (const [key, value] of Object.entries(labs)) {
+            const range = FUNCTIONAL_RANGES[key];
+            if (!range) continue;
+
+            let status = "Optimal";
+            let isRisk = false;
+
+            if (value < range.min) {
+                status = range.low;
+                isRisk = true;
+            } else if (value > range.max) {
+                status = range.high;
+                isRisk = true;
+            }
+
+            if (isRisk) {
+                insights.push({
+                    marker: range.label,
+                    value: value,
+                    unit: range.unit,
+                    status: status,
+                    target: `${range.min}-${range.max}`
+                });
+            }
+        }
+        return insights;
+    }
 
     function saveState() {
         localStorage.setItem('mediDocState', JSON.stringify(state));
@@ -137,6 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             state.rawText = text;
             state.entities = performMedicalAnalysis(text);
+
+            // Extract Lab Values
+            state.labs = extractLabValues(text);
 
             // Auto-extract demographics
             const demographics = extractDemographics(text);
@@ -468,6 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Enhanced SOAP Generation ---
     function generateSOAP() {
+        try {
         // 1. Sync Patient Header
         document.getElementById('soap-p-name').innerText = state.patient.name || 'Not Recorded';
         document.getElementById('soap-p-dob').innerText = state.patient.dob || 'Not Recorded';
@@ -531,6 +611,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr><td>Urinalysis</td><td>08-16-2015</td><td>08-16-2016</td><td>Performed</td></tr>
             <tr><td>Diabetes, Eye Exam</td><td>07-25-2015</td><td>07-25-2016</td><td>Performed</td></tr>
         `;
+        } catch (e) {
+            console.error("Error generating SOAP:", e);
+            document.getElementById('assessment-plan').innerHTML = `<p style="color:red">Error generating report: ${e.message}</p>`;
+        }
     }
 
     function checkDataIntegrity() {
@@ -723,44 +807,60 @@ document.addEventListener('DOMContentLoaded', () => {
     function performFunctionalSynthesis() {
         let analysis = `<h5>Functional Synthesis</h5>`;
 
-        // --- 1. Autonomic & Circadian (Wearables) ---
-        if (state.vitals.hrv < 30) {
+        // --- 1. Biomarker Analysis (New Comprehensive Section) ---
+        const labInsights = analyzeBiomarkers(state.labs || {});
+        if (labInsights.length > 0) {
+            analysis += `<div class="biomarker-section"><h6>🧬 Biomarker Deviation Analysis (Functional)</h6>`;
+            labInsights.forEach(insight => {
+                analysis += `
+                    <div class="insight-card ${insight.color}">
+                        <strong>${insight.marker}:</strong> ${insight.value} ${insight.unit}
+                        <br><span class="status">${insight.status}</span>
+                        <br><span class="target-range">Functional Target: ${insight.target}</span>
+                    </div>`;
+            });
+            analysis += `</div>`;
+        } else if (Object.keys(state.labs).length > 0) {
+            analysis += `<p>✅ All extracted biomarkers appear within optimal functional ranges.</p>`;
+        } else {
+            // No labs found logic
+            const raw = state.rawText.toLowerCase();
+            if (raw.length > 0 && !raw.includes('blood') && !raw.includes('lab')) {
+                analysis += `<p><em>No blood biomarkers detected in the provided text. Please ensure lab results are clearly visible.</em></p>`;
+            }
+        }
+
+        // --- 2. Autonomic & Circadian (Wearables) ---
+        if (state.vitals.hrv && state.vitals.hrv < 30) {
             analysis += `<p>⚠️ <strong>Low HRV detected (${state.vitals.hrv}ms):</strong> May indicate high physiological stress, systemic inflammation, or poor recovery. Cross-reference with CRP-hs and Sleep data.</p>`;
-        } else if (state.vitals.hrv > 70) {
+        } else if (state.vitals.hrv && state.vitals.hrv > 70) {
             analysis += `<p>✨ <strong>HRV Optimal (${state.vitals.hrv}ms):</strong> High adaptive capacity noted.</p>`;
-        }
-
-        // --- 2. Glycemic & Metabolic (Blood Work Markers) ---
-        // Simulated check for markers in raw text or labs state
-        const raw = state.rawText.toLowerCase();
-        if (raw.includes('hba1c') || raw.includes('hemoglobin a1c')) {
-            analysis += `<p>🩸 <strong>Glycemic Control:</strong> HbA1c review recommended. <em>Rationale:</em> Chronic hyperglycemia (HbA1c > 5.7%) correlates with vascular damage. Justifies CPT 83036 for monitoring.</p>`;
-        }
-
-        if (raw.includes('crp') || raw.includes('c-reactive')) {
-            analysis += `<p>🔥 <strong>Inflammatory Status:</strong> CRP-hs markers indicate systemic inflammation. High CRP + Low HRV suggests increased risk of CV event. <em>Justification:</em> Medical rationale for aggressive lifestyle/statin intervention.</p>`;
         }
 
         // --- 3. Medication Interaction ---
         const meds = state.entities.find(e => e.category === 'Medications Found')?.items || [];
-        if (meds.some(m => /Beta|Atenolol|Metoprolol/i.test(m))) {
-            analysis += `<p>💊 <strong>Medication Impact:</strong> Beta-blocker detected. Caution: This suppresses HR/HRV response. Autonomic data should be interpreted with medication-adjusted baseline.</p>`;
-        }
+        if (meds.length > 0) {
+            analysis += `<h6>💊 Medication Impact Analysis</h6>`;
 
-        if (meds.some(m => /Statin|Atorvastatin|Lipitor|Rosuvastatin|Simvastatin/i.test(m))) {
-            analysis += `<p>🛡️ <strong>Lipid Therapy:</strong> Statin use noted. Ensure CoQ10 levels and Liver enzymes (ALT/AST) are monitored annually. CoQ10 depletion is a common side effect.</p>`;
-        }
+            if (meds.some(m => /Beta|Atenolol|Metoprolol/i.test(m))) {
+                analysis += `<p><strong>Beta-blocker detected:</strong> Caution: This suppresses HR/HRV response. Autonomic data should be interpreted with medication-adjusted baseline.</p>`;
+            }
 
-        if (meds.some(m => /Warfarin|Eliquis|Xarelto|Clopidogrel|Aspirin/i.test(m))) {
-             analysis += `<p>🩸 <strong>Anticoagulation:</strong> Patient is on blood thinners. Monitor for bleeding risks. Check INR/PT if on Warfarin. Caution with supplements that affect clotting (e.g., high dose Omega-3, Curcumin, Vitamin E).</p>`;
-        }
+            if (meds.some(m => /Statin|Atorvastatin|Lipitor|Rosuvastatin|Simvastatin/i.test(m))) {
+                analysis += `<p><strong>Lipid Therapy:</strong> Statin use noted. Ensure CoQ10 levels and Liver enzymes (ALT/AST) are monitored annually. CoQ10 depletion is a common side effect.</p>`;
+            }
 
-        if (meds.some(m => /Lisinopril|Losartan|Valsartan/i.test(m))) {
-             analysis += `<p>🫀 <strong>RAAS Inhibition:</strong> ACE-I/ARB detected. Monitor Potassium (K+) and Renal Function (Creatinine/eGFR). Essential for renal protection in diabetes.</p>`;
-        }
+            if (meds.some(m => /Warfarin|Eliquis|Xarelto|Clopidogrel|Aspirin/i.test(m))) {
+                 analysis += `<p><strong>Anticoagulation:</strong> Patient is on blood thinners. Monitor for bleeding risks. Check INR/PT if on Warfarin. Caution with supplements that affect clotting (e.g., high dose Omega-3, Curcumin, Vitamin E).</p>`;
+            }
 
-        if (meds.some(m => /Hydrochlorothiazide|Furosemide/i.test(m))) {
-             analysis += `<p>💧 <strong>Diuretic Therapy:</strong> Monitor electrolytes (Na+, K+, Mg2+) regularly. Risk of hypokalemia and dehydration.</p>`;
+            if (meds.some(m => /Lisinopril|Losartan|Valsartan/i.test(m))) {
+                 analysis += `<p><strong>RAAS Inhibition:</strong> ACE-I/ARB detected. Monitor Potassium (K+) and Renal Function (Creatinine/eGFR). Essential for renal protection in diabetes.</p>`;
+            }
+
+            if (meds.some(m => /Hydrochlorothiazide|Furosemide/i.test(m))) {
+                 analysis += `<p><strong>Diuretic Therapy:</strong> Monitor electrolytes (Na+, K+, Mg2+) regularly. Risk of hypokalemia and dehydration.</p>`;
+            }
         }
 
         return analysis;
@@ -769,11 +869,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateRecommendations() {
         let html = '';
         const raw = state.rawText.toLowerCase();
+        const labs = state.labs || {};
 
         // 1. Diagnostic & Labs (Biller Focused)
         html += `<h5>I. Diagnostic Tests & Clinical Rationale</h5>`;
-        if (state.vitals.hrv < 30) {
+        if (state.vitals.hrv && state.vitals.hrv < 30) {
             html += `<div class="rec-card"><strong>Advanced Autonomic Study (CPT 95921):</strong> Rationale: Severe HRV depression suggests dysautonomia risk. Necessary for clinical differentiation.</div>`;
+        }
+
+        if (labs.hba1c && labs.hba1c > 5.6) {
+             html += `<div class="rec-card"><strong>Fasting Insulin & C-Peptide:</strong> Rationale: HbA1c > 5.6% indicates insulin resistance. Fasting insulin needed to calculate HOMA-IR score.</div>`;
+        }
+
+        if (labs.tsh && labs.tsh > 2.5) {
+             html += `<div class="rec-card"><strong>Full Thyroid Panel (Free T3/T4, TPO):</strong> Rationale: TSH > 2.5 is functionally high. Rule out Hashimoto's auto-immunity.</div>`;
         }
 
         if (!raw.includes('dna')) {
@@ -786,9 +895,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. Lifestyle, Biohacks & Supplements (Research Based)
         html += `<h5 class="mt-1">II. Lifestyle, Biohacks & OTC Protocols</h5>`;
-        if (state.vitals.hrv < 40) {
+
+        // Lab Specific Supplements
+        if (labs.vit_d && labs.vit_d < 50) {
+            html += `<div class="rec-card supplement"><strong>Vitamin D3/K2 Protocol:</strong> 5,000-10,000 IU daily to reach target >50ng/mL. Must pair with K2 (MK-7) to protect arteries.</div>`;
+        }
+        if (labs.b12 && labs.b12 < 500) {
+            html += `<div class="rec-card supplement"><strong>Methylated B-Complex:</strong> Methylcobalamin form required for optimal absorption and methylation support.</div>`;
+        }
+        if (labs.ferritin && labs.ferritin < 50) {
+            html += `<div class="rec-card supplement"><strong>Iron Bisglycinate + Vitamin C:</strong> Gentle iron form taken with C for absorption. Recheck Ferritin in 8 weeks.</div>`;
+        }
+        if (labs.magnesium && labs.magnesium < 5.0) {
+            html += `<div class="rec-card supplement"><strong>Magnesium L-Threonate or Glycinate:</strong> 400mg nightly to support RBC levels, HRV, and sleep architecture.</div>`;
+        }
+
+        if (state.vitals.hrv && state.vitals.hrv < 40) {
             html += `<div class="rec-card biohack"><strong>Biohack: Cold Thermogenesis/Breathwork:</strong> 3 min cold exposure + 5 min Box Breathing to upregulate Vagal Tone.</div>`;
-            html += `<div class="rec-card supplement"><strong>Protocol: Magnesium Bisglycinate (400mg):</strong> High bioavailability for nervous system recovery and sleep.</div>`;
         }
         html += `<div class="rec-card exercise"><strong>Zone 2 Aerobic Training:</strong> 150 min/wk to improve mitochondrial density and VO2 max.</div>`;
         html += `<div class="rec-card sleep"><strong>Circadian Optimization:</strong> Blue-light blocking after sunset; 10 min morning sun exposure for cortisol regulation.</div>`;
