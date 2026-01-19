@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const vBP = document.getElementById('v-bp');
     const vSPO2 = document.getElementById('v-spo2');
     const syncWearablesBtn = document.getElementById('sync-wearables');
+    const clearDataBtn = document.getElementById('clear-data');
 
     // UI Elements - SOAP
     const soapDoc = document.getElementById('soap-document');
@@ -23,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const downloadPdfBtn = document.getElementById('download-pdf');
 
     const addCodeBtn = document.getElementById('add-code-btn');
+    const codeList = document.getElementById('code-list');
+    const newCodeInput = document.getElementById('new-code');
+    const newCodeDescInput = document.getElementById('new-code-desc');
     const statusText = document.getElementById('status-text') || { textContent: '' }; // Fallback
 
     // UI Elements - Voice
@@ -39,9 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatMessages = document.getElementById('chat-messages');
 
     const downloadWordBtn = document.getElementById('download-word');
+    const themeToggleBtn = document.getElementById('theme-toggle');
 
     // App State
-    let state = {
+    const savedState = localStorage.getItem('mediDocState');
+    let state = savedState ? JSON.parse(savedState) : {
         rawText: '',
         patient: { name: '', dob: '', age: '', sex: '', chart: 'AW-7742', provider: 'Andre Bezerra, APRN' },
         history: {
@@ -53,12 +59,116 @@ document.addEventListener('DOMContentLoaded', () => {
             complaint: ''
         },
         entities: [],
+        labs: {}, // Store extracted numerical lab values
         vitals: { hr: 65, hrv: 45, bp: '120/80', spo2: 98 },
         codes: [
             { code: 'Z00.00', desc: 'Encounter for general adult medical examination', justification: 'Standard baseline assessment code.' }
         ],
         analysis: null
     };
+
+    // --- Functional Medicine Logic ---
+    const FUNCTIONAL_RANGES = {
+        tsh: { min: 1.0, max: 2.5, unit: 'mIU/L', label: 'Thyroid (TSH)', low: "Hyperthyroid Pattern", high: "Subclinical Hypothyroid Pattern" },
+        vit_d: { min: 50, max: 80, unit: 'ng/mL', label: 'Vitamin D (25-OH)', low: "Suboptimal (<50)", high: "Potential Toxicity" },
+        hba1c: { min: 4.5, max: 5.3, unit: '%', label: 'HbA1c', low: "Hypoglycemia Risk", high: "Insulin Resistance (>5.3)" },
+        hdl: { min: 55, max: 100, unit: 'mg/dL', label: 'HDL Cholesterol', low: "Metabolic Risk", high: "Optimal" },
+        ldl: { min: 0, max: 100, unit: 'mg/dL', label: 'LDL Cholesterol', low: "Optimal", high: "Atherogenic Risk (>100)" },
+        trig: { min: 0, max: 80, unit: 'mg/dL', label: 'Triglycerides', low: "Optimal", high: "Carbohydrate Intolerance (>80)" },
+        ferritin: { min: 50, max: 150, unit: 'ng/mL', label: 'Ferritin', low: "Iron Insufficiency", high: "Inflammation/Overload" },
+        b12: { min: 500, max: 1200, unit: 'pg/mL', label: 'Vitamin B12', low: "Methylation Deficit", high: "Optimal" },
+        crp: { min: 0, max: 1.0, unit: 'mg/L', label: 'hs-CRP', low: "Optimal", high: "Systemic Inflammation" },
+        magnesium: { min: 5.0, max: 7.0, unit: 'mg/dL', label: 'RBC Magnesium', low: "Deficiency", high: "Optimal" },
+        homocysteine: { min: 0, max: 7.0, unit: 'umol/L', label: 'Homocysteine', low: "Optimal", high: "Methylation Issue" }
+    };
+
+    function extractLabValues(text) {
+        const extracted = {};
+        const t = text.replace(/\n/g, " "); // Flatten for regex
+
+        const patterns = {
+            tsh: /(?:TSH|Thyroid Stimulating Hormone)[^\d]*(\d+\.?\d*)/i,
+            vit_d: /(?:Vitamin D|Vit D|25-OH)[^\d]*(\d{2,3})/i,
+            hba1c: /(?:HbA1c|Hemoglobin A1c)[^\d]*(\d\.?\d?)/i,
+            hdl: /(?:HDL|High Density Lipoprotein)[^\d]*(\d{2,3})/i,
+            ldl: /(?:LDL|Low Density Lipoprotein)[^\d]*(\d{2,3})/i,
+            trig: /(?:Triglycerides|Trigs)[^\d]*(\d{2,3})/i,
+            ferritin: /Ferritin[^\d]*(\d{1,3})/i,
+            b12: /(?:Vitamin B12|B12|Cobalamin)[^\d]*(\d{3,4})/i,
+            crp: /(?:CRP|C-Reactive Protein)[^\d]*(\d+\.?\d*)/i,
+            homocysteine: /Homocysteine[^\d]*(\d+\.?\d*)/i
+        };
+
+        for (const [key, regex] of Object.entries(patterns)) {
+            const match = t.match(regex);
+            if (match && match[1]) {
+                extracted[key] = parseFloat(match[1]);
+            }
+        }
+        return extracted;
+    }
+
+    function analyzeBiomarkers(labs) {
+        const insights = [];
+
+        for (const [key, value] of Object.entries(labs)) {
+            const range = FUNCTIONAL_RANGES[key];
+            if (!range) continue;
+
+            let status = "Optimal";
+            let isRisk = false;
+
+            if (value < range.min) {
+                status = range.low;
+                isRisk = true;
+            } else if (value > range.max) {
+                status = range.high;
+                isRisk = true;
+            }
+
+            if (isRisk) {
+                insights.push({
+                    marker: range.label,
+                    value: value,
+                    unit: range.unit,
+                    status: status,
+                    target: `${range.min}-${range.max}`
+                });
+            }
+        }
+        return insights;
+    }
+
+    function saveState() {
+        localStorage.setItem('mediDocState', JSON.stringify(state));
+    }
+
+    // Initialize UI with state
+    if (savedState) {
+        // Restore demographics
+        if (state.patient.name) document.getElementById('p-name').value = state.patient.name;
+        if (state.patient.dob) document.getElementById('p-dob').value = state.patient.dob;
+        if (state.patient.age) document.getElementById('p-age').value = state.patient.age;
+        if (state.patient.sex) document.getElementById('p-sex').value = state.patient.sex;
+
+        // Restore other fields
+        if (state.history.medical) document.getElementById('h-medical').value = state.history.medical;
+        if (state.history.surgical) document.getElementById('h-surgical').value = state.history.surgical;
+        if (state.history.family) document.getElementById('h-family').value = state.history.family;
+        if (state.history.social) document.getElementById('h-social').value = state.history.social;
+        if (state.history.allergies) document.getElementById('h-allergies').value = state.history.allergies;
+        if (state.history.complaint) document.getElementById('p-complaint').value = state.history.complaint;
+
+        if (state.vitals.hr) document.getElementById('v-hr').value = state.vitals.hr;
+        if (state.vitals.hrv) document.getElementById('v-hrv').value = state.vitals.hrv;
+        if (state.vitals.bp) document.getElementById('v-bp').value = state.vitals.bp;
+        if (state.vitals.spo2) document.getElementById('v-spo2').value = state.vitals.spo2;
+
+        if (state.patient.provider) document.getElementById('p-provider').value = state.patient.provider;
+        if (state.patient.chart) document.getElementById('p-chart').value = state.patient.chart;
+
+        if (state.codes.length > 0) renderCodes();
+    }
 
     // --- Tab Management ---
     viewTabs.forEach(tab => {
@@ -106,9 +216,13 @@ document.addEventListener('DOMContentLoaded', () => {
             state.rawText = text;
             state.entities = performMedicalAnalysis(text);
 
+            // Extract Lab Values
+            state.labs = extractLabValues(text);
+
             // Auto-extract demographics
             const demographics = extractDemographics(text);
             Object.assign(state.patient, demographics);
+            saveState();
 
             // Auto-populate dashboard
             if (state.patient.name) document.getElementById('p-name').value = state.patient.name;
@@ -130,8 +244,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function extractDemographics(text) {
-        // Simple regex-based demographic extraction
-        const nameMatch = text.match(/(?:Name|Patient):\s*([A-Za-z\s]{5,30})/i);
+        // Improved regex-based demographic extraction
+        // Capture until end of line to avoid grabbing subsequent fields
+        const nameMatch = text.match(/(?:Name|Patient):\s*([^\n\r]+)/i);
         const dobMatch = text.match(/(?:DOB|Date of Birth):\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
         const ageMatch = text.match(/(?:Age):\s*(\d{1,3})/i);
         const sexMatch = text.match(/(?:Sex|Gender):\s*(M|F|Male|Female|Other)/i);
@@ -143,13 +258,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sexMatch) demographics.sex = sexMatch[1].trim().charAt(0).toUpperCase();
 
         return demographics;
-    }
-
-    function updateDemographicsUI() {
-        document.getElementById('p-name').value = state.patient.name;
-        document.getElementById('p-dob').value = state.patient.dob;
-        document.getElementById('p-age').value = state.patient.age;
-        document.getElementById('p-sex').value = state.patient.sex;
     }
 
     // --- Vitals & History Sync ---
@@ -166,6 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (id.startsWith('p-')) state.patient[id.split('-')[1]] = el.value;
                 if (id.startsWith('v-')) state.vitals[id.split('-')[1]] = el.value;
                 if (id.startsWith('h-')) state.history[id.split('-')[1]] = el.value;
+                saveState();
             });
         }
     });
@@ -179,6 +288,15 @@ document.addEventListener('DOMContentLoaded', () => {
         state.vitals = { hr: 62, hrv: 58, bp: "118/76", spo2: 99 };
         alert('Data synced from Oura/Apple Health (Mock)');
     });
+
+    if (clearDataBtn) {
+        clearDataBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all patient data? This cannot be undone.')) {
+                localStorage.removeItem('mediDocState');
+                location.reload();
+            }
+        });
+    }
 
     // --- Clinical Coding Logic ---
     addCodeBtn.addEventListener('click', () => {
@@ -395,6 +513,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Lifestyle & Biohacks
+        if (q.includes('sleep') || q.includes('apnea') || q.includes('cpap')) {
+            return "Sleep Apnea (OSA): Defined by AHI > 5. Symptoms: Snoring, daytime fatigue, morning headaches. Risks: HTN, AFib, Stroke, insulin resistance. Diagnosis: Home sleep test or PSG (CPT 95810). Treatment: CPAP, oral appliance, weight loss, position therapy.";
+        }
         if (q.includes('zone 2') || q.includes('cardio') || q.includes('aerobic')) {
             return "Zone 2 Training: Aerobic exercise at 60-70% max HR (conversational pace). Benefits: Mitochondrial biogenesis, fat oxidation, metabolic flexibility, VO2max improvement. Prescription: 150-180 min/week. Modalities: Cycling, rowing, incline walking. Monitor via HR or lactate (2mmol/L).";
         }
@@ -437,69 +558,84 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Enhanced SOAP Generation ---
     function generateSOAP() {
-        // 1. Sync Patient Header
-        document.getElementById('soap-p-name').innerText = state.patient.name || 'Not Recorded';
-        document.getElementById('soap-p-dob').innerText = state.patient.dob || 'Not Recorded';
-        document.getElementById('soap-p-age').innerText = state.patient.age || '--';
-        document.getElementById('soap-p-sex').innerText = (document.getElementById('p-sex')?.value) || '--';
-        document.getElementById('soap-p-chart').innerText = state.patient.chart || 'AW-7742';
-        document.getElementById('soap-p-provider').innerText = state.patient.provider || 'Andre Bezerra, APRN';
-        document.getElementById('soap-footer-provider').innerText = state.patient.provider || 'Andre Bezerra, APRN';
+        try {
+            // 1. Sync Patient Header
+            document.getElementById('soap-p-name').innerText = state.patient.name || 'Not Recorded';
+            document.getElementById('soap-p-dob').innerText = state.patient.dob || 'Not Recorded';
+            document.getElementById('soap-p-age').innerText = state.patient.age || '--';
+            document.getElementById('soap-p-sex').innerText = (document.getElementById('p-sex')?.value) || '--';
+            document.getElementById('soap-p-chart').innerText = state.patient.chart || 'AW-7742';
+            document.getElementById('soap-p-provider').innerText = state.patient.provider || 'Andre Bezerra, APRN';
+            document.getElementById('soap-footer-provider').innerText = state.patient.provider || 'Andre Bezerra, APRN';
 
-        // 2. Populate Clinical Sections
-        document.getElementById('soap-complaint').innerText = state.history.complaint || "Routine review of medical records.";
+            // 2. Populate Clinical Sections
+            document.getElementById('soap-complaint').innerText = state.history.complaint || "Routine review of medical records.";
 
-        const hpiText = document.getElementById('doctor-note').value;
-        document.getElementById('soap-hpi').innerText = hpiText || "Patient presents for a comprehensive review of laboratory results. Reports no acute complaints at this time. Denies fatigue, polyuria, polydipsia, weight changes, chest pain, shortness of breath, or abdominal pain.";
+            const hpiText = document.getElementById('doctor-note').value;
+            document.getElementById('soap-hpi').innerText = hpiText || "Patient presents for a comprehensive review of laboratory results. Reports no acute complaints at this time. Denies fatigue, polyuria, polydipsia, weight changes, chest pain, shortness of breath, or abdominal pain.";
 
-        document.getElementById('soap-medical-hx').innerText = state.history.medical || "1. HLH\n2. High Cholesterol\n3. HTN\n4. GERD\n5. Constipation\n6. Hearing Loss\n7. OA\n8. Anxiety";
-        document.getElementById('soap-surgical-hx').innerText = state.history.surgical || "1. Eye Surgery\n2. Excision of skin cancer\n3. Cholecystectomy\n4. R. Knee Replacement (2018)\n5. Carotid endarterectomy";
-        document.getElementById('soap-family-hx').innerText = state.history.family || "Non-contributory per patient report.";
-        document.getElementById('soap-social-hx').innerText = state.history.social || "Denies tobacco/illicit drug use.";
+            document.getElementById('soap-medical-hx').innerText = state.history.medical || "1. HLH\n2. High Cholesterol\n3. HTN\n4. GERD\n5. Constipation\n6. Hearing Loss\n7. OA\n8. Anxiety";
+            document.getElementById('soap-surgical-hx').innerText = state.history.surgical || "1. Eye Surgery\n2. Excision of skin cancer\n3. Cholecystectomy\n4. R. Knee Replacement (2018)\n5. Carotid endarterectomy";
+            document.getElementById('soap-family-hx').innerText = state.history.family || "Non-contributory per patient report.";
+            document.getElementById('soap-social-hx').innerText = state.history.social || "Denies tobacco/illicit drug use.";
 
-        // Dynamic Smoking Status based on Social Hx or explicit field
-        const social = state.history.social.toLowerCase();
-        let smokingStatus = "Never Smoker";
-        if (social.includes('smoke') || social.includes('tobacco')) smokingStatus = "Current Smoker / Tobacco User";
-        if (social.includes('former') || social.includes('quit')) smokingStatus = "Former Smoker";
-        document.getElementById('soap-smoking').innerText = smokingStatus;
+            // Dynamic Smoking Status based on Social Hx or explicit field
+            const social = state.history.social.toLowerCase();
+            let smokingStatus = "Never Smoker";
+            if (social.includes('smoke') || social.includes('tobacco')) smokingStatus = "Current Smoker / Tobacco User";
+            if (social.includes('former') || social.includes('quit')) smokingStatus = "Former Smoker";
+            document.getElementById('soap-smoking').innerText = smokingStatus;
 
-        document.getElementById('soap-allergies').innerText = state.history.allergies || "No Known Drug Allergies (NKDA).";
+            document.getElementById('soap-allergies').innerText = state.history.allergies || "No Known Drug Allergies (NKDA).";
 
-        // 3. Medications Table
-        const meds = state.entities.find(e => e.category === 'Medications Found')?.items || [];
-        const medsTable = document.getElementById('soap-meds-table');
-        if (meds.length) {
-            let html = `<table class="clinical-table"><thead><tr><th>Medication</th><th>Dose/Freq</th></tr></thead><tbody>`;
-            meds.forEach(m => html += `<tr><td>${m}</td><td>One Po Q Day</td></tr>`);
-            html += `</tbody></table>`;
-            medsTable.innerHTML = html;
-        } else {
-            // Default clinical example if nothing found
-            medsTable.innerHTML = `<table class="clinical-table"><thead><tr><th>Medication</th><th>Dose/Freq</th></tr></thead><tbody>
-                <tr><td>Potassium Chloride Crys Er 10MEQ</td><td>One Po Q Day</td></tr>
-                <tr><td>Azithromycin 250MG Tablet</td><td>Take 2 Tabs Po X 1, Then 1 Tab Daily X4 Days</td></tr>
-                <tr><td>Metformin Hcl 500MG Tablet</td><td>1 Bid</td></tr>
-                <tr><td>Atenolol 25MG Tablet</td><td>1 Po Q Am at T</td></tr>
-            </tbody></table>`;
-        }
+            // 3. Medications Table
+        const meds = (state.entities || []).find(e => e.category === 'Medications Found')?.items || [];
+            const medsTable = document.getElementById('soap-meds-table');
+            if (meds.length) {
+                let html = `<table class="clinical-table"><thead><tr><th>Medication</th><th>Dose/Freq</th></tr></thead><tbody>`;
+                meds.forEach(m => html += `<tr><td>${m}</td><td>One Po Q Day</td></tr>`);
+                html += `</tbody></table>`;
+                medsTable.innerHTML = html;
+            } else {
+                // Default clinical example if nothing found
+                medsTable.innerHTML = `<table class="clinical-table"><thead><tr><th>Medication</th><th>Dose/Freq</th></tr></thead><tbody>
+                    <tr><td>Potassium Chloride Crys Er 10MEQ</td><td>One Po Q Day</td></tr>
+                    <tr><td>Azithromycin 250MG Tablet</td><td>Take 2 Tabs Po X 1, Then 1 Tab Daily X4 Days</td></tr>
+                    <tr><td>Metformin Hcl 500MG Tablet</td><td>1 Bid</td></tr>
+                    <tr><td>Atenolol 25MG Tablet</td><td>1 Po Q Am at T</td></tr>
+                </tbody></table>`;
+            }
 
-        // 4. Assessment (ICD Codes)
-        renderCodes();
+            // 4. Assessment (ICD Codes)
+            renderCodes();
 
-        // 5. Plan & Synthesis
-        document.getElementById('assessment-plan').innerHTML = performFunctionalSynthesis();
+            // 5. Plan & Synthesis
+            document.getElementById('assessment-plan').innerHTML = performFunctionalSynthesis();
 
-        // 6. Partition Recommendations
-        renderStructuredRecommendations();
+            // 6. Partition Recommendations - NOW USING THE CARD-BASED GENERATOR
+            const recsHtml = generateRecommendations();
 
-        // 7. Health Maintenance
+            // Distribute to sections based on content to simulate partitioning,
+            // or just dump it all in "Lifestyle" if that's easier, but let's try to be smart.
+            // Since generateRecommendations returns one big blob, we'll put it in Lifestyle
+            // and clear the others to avoid duplication or confusion.
+            document.getElementById('soap-lifestyle').innerHTML = recsHtml;
+            document.getElementById('peptide-content').innerHTML = ''; // Cleared as included in recsHtml
+            document.getElementById('soap-supplements').innerHTML = ''; // Cleared as included in recsHtml
+            document.getElementById('soap-monitoring').innerHTML = ''; // Cleared as included in recsHtml
+            document.getElementById('soap-education').innerHTML = ''; // Cleared as included in recsHtml
+
+            // 7. Health Maintenance
         const maintenanceTable = document.getElementById('soap-maintenance-rows');
         maintenanceTable.innerHTML = `
             <tr><td>Influenza Vaccine</td><td>02/07/2016</td><td>02/07/2017</td><td>Performed</td></tr>
             <tr><td>Urinalysis</td><td>08-16-2015</td><td>08-16-2016</td><td>Performed</td></tr>
             <tr><td>Diabetes, Eye Exam</td><td>07-25-2015</td><td>07-25-2016</td><td>Performed</td></tr>
         `;
+        } catch (e) {
+            console.error("Error generating SOAP:", e);
+            document.getElementById('assessment-plan').innerHTML = `<p style="color:red">Error generating report: ${e.message}</p>`;
+        }
     }
 
     function checkDataIntegrity() {
@@ -692,32 +828,60 @@ document.addEventListener('DOMContentLoaded', () => {
     function performFunctionalSynthesis() {
         let analysis = `<h5>Functional Synthesis</h5>`;
 
-        // --- 1. Autonomic & Circadian (Wearables) ---
-        if (state.vitals.hrv < 30) {
+        // --- 1. Biomarker Analysis (New Comprehensive Section) ---
+        const labInsights = analyzeBiomarkers(state.labs || {});
+        if (labInsights.length > 0) {
+            analysis += `<div class="biomarker-section"><h6>🧬 Biomarker Deviation Analysis (Functional)</h6>`;
+            labInsights.forEach(insight => {
+                analysis += `
+                    <div class="insight-card ${insight.color}">
+                        <strong>${insight.marker}:</strong> ${insight.value} ${insight.unit}
+                        <br><span class="status">${insight.status}</span>
+                        <br><span class="target-range">Functional Target: ${insight.target}</span>
+                    </div>`;
+            });
+            analysis += `</div>`;
+        } else if (Object.keys(state.labs).length > 0) {
+            analysis += `<p>✅ All extracted biomarkers appear within optimal functional ranges.</p>`;
+        } else {
+            // No labs found logic
+            const raw = (state.rawText || '').toLowerCase();
+            if (raw.length > 0 && !raw.includes('blood') && !raw.includes('lab')) {
+                analysis += `<p><em>No blood biomarkers detected in the provided text. Please ensure lab results are clearly visible.</em></p>`;
+            }
+        }
+
+        // --- 2. Autonomic & Circadian (Wearables) ---
+        if (state.vitals.hrv && state.vitals.hrv < 30) {
             analysis += `<p>⚠️ <strong>Low HRV detected (${state.vitals.hrv}ms):</strong> May indicate high physiological stress, systemic inflammation, or poor recovery. Cross-reference with CRP-hs and Sleep data.</p>`;
-        } else if (state.vitals.hrv > 70) {
+        } else if (state.vitals.hrv && state.vitals.hrv > 70) {
             analysis += `<p>✨ <strong>HRV Optimal (${state.vitals.hrv}ms):</strong> High adaptive capacity noted.</p>`;
-        }
-
-        // --- 2. Glycemic & Metabolic (Blood Work Markers) ---
-        // Simulated check for markers in raw text or labs state
-        const raw = state.rawText.toLowerCase();
-        if (raw.includes('hba1c') || raw.includes('hemoglobin a1c')) {
-            analysis += `<p>🩸 <strong>Glycemic Control:</strong> HbA1c review recommended. <em>Rationale:</em> Chronic hyperglycemia (HbA1c > 5.7%) correlates with vascular damage. Justifies CPT 83036 for monitoring.</p>`;
-        }
-
-        if (raw.includes('crp') || raw.includes('c-reactive')) {
-            analysis += `<p>🔥 <strong>Inflammatory Status:</strong> CRP-hs markers indicate systemic inflammation. High CRP + Low HRV suggests increased risk of CV event. <em>Justification:</em> Medical rationale for aggressive lifestyle/statin intervention.</p>`;
         }
 
         // --- 3. Medication Interaction ---
         const meds = state.entities.find(e => e.category === 'Medications Found')?.items || [];
-        if (meds.some(m => /Beta|Atenolol|Metoprolol/i.test(m))) {
-            analysis += `<p>💊 <strong>Medication Impact:</strong> Beta-blocker detected. Caution: This suppresses HR/HRV response. Autonomic data should be interpreted with medication-adjusted baseline.</p>`;
-        }
+        if (meds.length > 0) {
+            analysis += `<h6>💊 Medication Impact Analysis</h6>`;
 
-        if (meds.some(m => /Statin|Atorvastatin|Lipitor/i.test(m))) {
-            analysis += `<p>🛡️ <strong>Lipid Therapy:</strong> Statin use noted. Ensure CoQ10 levels and Liver enzymes (ALT/AST) are monitored annually.</p>`;
+            if (meds.some(m => /Beta|Atenolol|Metoprolol/i.test(m))) {
+                analysis += `<p><strong>Beta-blocker detected:</strong> Caution: This suppresses HR/HRV response. Autonomic data should be interpreted with medication-adjusted baseline.</p>`;
+            }
+
+            if (meds.some(m => /Statin|Atorvastatin|Lipitor|Rosuvastatin|Simvastatin/i.test(m))) {
+                analysis += `<p><strong>Lipid Therapy:</strong> Statin use noted. Ensure CoQ10 levels and Liver enzymes (ALT/AST) are monitored annually. CoQ10 depletion is a common side effect.</p>`;
+            }
+
+            if (meds.some(m => /Warfarin|Eliquis|Xarelto|Clopidogrel|Aspirin/i.test(m))) {
+                 analysis += `<p><strong>Anticoagulation:</strong> Patient is on blood thinners. Monitor for bleeding risks. Check INR/PT if on Warfarin. Caution with supplements that affect clotting (e.g., high dose Omega-3, Curcumin, Vitamin E).</p>`;
+            }
+
+            if (meds.some(m => /Lisinopril|Losartan|Valsartan/i.test(m))) {
+                 analysis += `<p><strong>RAAS Inhibition:</strong> ACE-I/ARB detected. Monitor Potassium (K+) and Renal Function (Creatinine/eGFR). Essential for renal protection in diabetes.</p>`;
+            }
+
+            if (meds.some(m => /Hydrochlorothiazide|Furosemide/i.test(m))) {
+                 analysis += `<p><strong>Diuretic Therapy:</strong> Monitor electrolytes (Na+, K+, Mg2+) regularly. Risk of hypokalemia and dehydration.</p>`;
+            }
         }
 
         return analysis;
@@ -725,12 +889,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function generateRecommendations() {
         let html = '';
-        const raw = state.rawText.toLowerCase();
+        const raw = (state.rawText || '').toLowerCase();
+        const labs = state.labs || {};
 
         // 1. Diagnostic & Labs (Biller Focused)
         html += `<h5>I. Diagnostic Tests & Clinical Rationale</h5>`;
-        if (state.vitals.hrv < 30) {
+        if (state.vitals.hrv && state.vitals.hrv < 30) {
             html += `<div class="rec-card"><strong>Advanced Autonomic Study (CPT 95921):</strong> Rationale: Severe HRV depression suggests dysautonomia risk. Necessary for clinical differentiation.</div>`;
+        }
+
+        if (labs.hba1c && labs.hba1c > 5.6) {
+             html += `<div class="rec-card"><strong>Fasting Insulin & C-Peptide:</strong> Rationale: HbA1c > 5.6% indicates insulin resistance. Fasting insulin needed to calculate HOMA-IR score.</div>`;
+        }
+
+        if (labs.tsh && labs.tsh > 2.5) {
+             html += `<div class="rec-card"><strong>Full Thyroid Panel (Free T3/T4, TPO):</strong> Rationale: TSH > 2.5 is functionally high. Rule out Hashimoto's auto-immunity.</div>`;
         }
 
         if (!raw.includes('dna')) {
@@ -743,9 +916,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. Lifestyle, Biohacks & Supplements (Research Based)
         html += `<h5 class="mt-1">II. Lifestyle, Biohacks & OTC Protocols</h5>`;
-        if (state.vitals.hrv < 40) {
+
+        // Lab Specific Supplements
+        if (labs.vit_d && labs.vit_d < 50) {
+            html += `<div class="rec-card supplement"><strong>Vitamin D3/K2 Protocol:</strong> 5,000-10,000 IU daily to reach target >50ng/mL. Must pair with K2 (MK-7) to protect arteries.</div>`;
+        }
+        if (labs.b12 && labs.b12 < 500) {
+            html += `<div class="rec-card supplement"><strong>Methylated B-Complex:</strong> Methylcobalamin form required for optimal absorption and methylation support.</div>`;
+        }
+        if (labs.ferritin && labs.ferritin < 50) {
+            html += `<div class="rec-card supplement"><strong>Iron Bisglycinate + Vitamin C:</strong> Gentle iron form taken with C for absorption. Recheck Ferritin in 8 weeks.</div>`;
+        }
+        if (labs.magnesium && labs.magnesium < 5.0) {
+            html += `<div class="rec-card supplement"><strong>Magnesium L-Threonate or Glycinate:</strong> 400mg nightly to support RBC levels, HRV, and sleep architecture.</div>`;
+        }
+
+        if (state.vitals.hrv && state.vitals.hrv < 40) {
             html += `<div class="rec-card biohack"><strong>Biohack: Cold Thermogenesis/Breathwork:</strong> 3 min cold exposure + 5 min Box Breathing to upregulate Vagal Tone.</div>`;
-            html += `<div class="rec-card supplement"><strong>Protocol: Magnesium Bisglycinate (400mg):</strong> High bioavailability for nervous system recovery and sleep.</div>`;
         }
         html += `<div class="rec-card exercise"><strong>Zone 2 Aerobic Training:</strong> 150 min/wk to improve mitochondrial density and VO2 max.</div>`;
         html += `<div class="rec-card sleep"><strong>Circadian Optimization:</strong> Blue-light blocking after sunset; 10 min morning sun exposure for cortisol regulation.</div>`;
@@ -811,11 +998,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function performMedicalAnalysis(text) {
         const entities = [];
-        const medRegex = /\b(Aspirin|Metformin|Lisinopril|Atorvastatin|Amlodipine|Metoprolol|Albuterol|Omeprazole|Warfarin|Levothyroxine)\b/gi;
+        // Expanded medication list (Top 30 prescribed + common)
+        const medRegex = /\b(Aspirin|Metformin|Lisinopril|Atorvastatin|Amlodipine|Metoprolol|Albuterol|Omeprazole|Warfarin|Levothyroxine|Simvastatin|Losartan|Gabapentin|Hydrochlorothiazide|Sertraline|Furosemide|Pantoprazole|Prednisone|Ibuprofen|Tylenol|Eliquis|Xarelto|Insulin|Glipizide|Rosuvastatin|Clopidogrel|Montelukast|Escitalopram|Bupropion|Amphetamine)\b/gi;
         const meds = [...new Set(text.match(medRegex) || [])];
         if (meds.length) entities.push({ category: 'Medications Found', items: meds });
 
-        const dxRegex = /\b(Hypertension|Diabetes|Asthma|COPD|Arthritis|Anxiety|Depression|Obesity|Hypothyroidism)\b/gi;
+        // Expanded diagnosis list
+        const dxRegex = /\b(Hypertension|Diabetes|Asthma|COPD|Arthritis|Anxiety|Depression|Obesity|Hypothyroidism|Hyperlipidemia|GERD|Sleep Apnea|Insomnia|Migraine|Back Pain|Osteoporosis|Kidney Disease|CKD|Heart Failure|CHF|Arrhythmia|Atrial Fibrillation|AFib|Stroke|TIA|Neuropathy|Dementia|Alzheimer|Cancer)\b/gi;
         const diagnoses = [...new Set(text.match(dxRegex) || [])];
         if (diagnoses.length) entities.push({ category: 'Symptoms Found', items: diagnoses });
 
@@ -827,6 +1016,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const matches = text.match(icd10Regex) || [];
         return [...new Set(matches)].map(code => ({ code, desc: 'Extracted from document' }));
     }
+
+    // --- Theme Toggle Logic ---
+    themeToggleBtn.addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        const isDark = document.body.classList.contains('dark-mode');
+        themeToggleBtn.innerText = isDark ? '☀️' : '🌗';
+
+        // Dynamic styles for Dark Mode (minimal implementation)
+        if (isDark) {
+            document.documentElement.style.setProperty('--bg-page', '#0f172a');
+            document.documentElement.style.setProperty('--bg-panel', '#1e293b');
+            document.documentElement.style.setProperty('--text-main', '#f1f5f9');
+            document.documentElement.style.setProperty('--text-muted', '#94a3b8');
+            document.documentElement.style.setProperty('--border-light', '#334155');
+        } else {
+            document.documentElement.style.setProperty('--bg-page', '#f8fafc');
+            document.documentElement.style.setProperty('--bg-panel', '#ffffff');
+            document.documentElement.style.setProperty('--text-main', '#1e293b');
+            document.documentElement.style.setProperty('--text-muted', '#64748b');
+            document.documentElement.style.setProperty('--border-light', '#e2e8f0');
+        }
+    });
 
     // --- Export Logic ---
     printBtn.addEventListener('click', () => window.print());

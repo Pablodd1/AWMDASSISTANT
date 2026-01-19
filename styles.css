@@ -209,6 +209,12 @@ main {
     gap: 2rem;
 }
 
+@media (max-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .glass-panel {
     background: var(--bg-panel);
     border-radius: 12px;
@@ -484,6 +490,65 @@ select:focus {
     border-bottom: 1px solid #e2e8f0;
     color: var(--text-main);
 }
+
+/* --- Biomarker Insights --- */
+.biomarker-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.insight-card {
+    border: 1px solid #e2e8f0;
+    border-left-width: 4px;
+    padding: 10px;
+    border-radius: 6px;
+    background: #fcfcfc;
+    font-size: 0.9rem;
+}
+
+.insight-card.red {
+    border-left-color: #ef4444;
+    background: #fff5f5;
+}
+
+.insight-card.green {
+    border-left-color: #10b981;
+    background: #f0fdf4;
+}
+
+.insight-card .status {
+    font-weight: 600;
+    color: #334155;
+}
+
+.insight-card .target-range {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+/* --- Recommendation Cards --- */
+.rec-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.rec-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.rec-card.biohack { border-left: 4px solid #8b5cf6; } /* Violet */
+.rec-card.supplement { border-left: 4px solid #10b981; } /* Emerald */
+.rec-card.exercise { border-left: 4px solid #f59e0b; } /* Amber */
+.rec-card.sleep { border-left: 4px solid #3b82f6; } /* Blue */
+.rec-card.peptide { border-left: 4px solid #ec4899; } /* Pink */
 
 .msg.user {
     background: var(--primary);
