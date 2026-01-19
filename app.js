@@ -466,11 +466,22 @@ document.addEventListener('DOMContentLoaded', () => {
     function getMedicalResponse(query) {
         const q = query.toLowerCase();
 
+        // 1. Peptides & Regenerative (Check first to avoid collisions like 'bp' in 'bpc-157')
+        if (q.includes('bpc-157') || q.includes('bpc')) {
+            return "BPC-157: 15-amino acid gastric peptide. Mechanism: Angiogenesis, collagen synthesis, anti-inflammatory. Uses: Tendon/ligament injuries, gut healing, neuroprotection. Dosing: 250-500mcg SQ/IM BID. Duration: 4-6 weeks. Physician-grade sourcing essential. Not FDA-approved.";
+        }
+        if (q.includes('tb-500') || q.includes('thymosin')) {
+            return "TB-500 (Thymosin Beta-4): Promotes tissue repair, angiogenesis, cell migration. Uses: Acute injuries, chronic inflammation, wound healing. Dosing: 2-5mg SQ 2x/week for 4-6 weeks, then maintenance 2mg/week. Often stacked with BPC-157. Research-only status.";
+        }
+        if (q.includes('cjc-1295') || q.includes('ipamorelin') || q.includes('growth hormone')) {
+            return "CJC-1295/Ipamorelin: GH secretagogue combo. Benefits: Increased lean mass, fat loss, recovery, sleep quality. Dosing: 200-300mcg each, SQ before bed. Contraindications: Active cancer, uncontrolled diabetes. Monitor: IGF-1, glucose, lipids. Requires MD prescription and clearance labs.";
+        }
+
         // Cardiovascular & Vitals
         if (q.includes('hrv') || q.includes('heart rate variability')) {
             return "HRV (Heart Rate Variability) measures parasympathetic tone and autonomic balance. Normal: 50-100ms. Low HRV (<30ms) indicates chronic stress, inflammation, or overtraining. Interventions: Zone 2 cardio, vagal breathing, cold exposure, magnesium supplementation.";
         }
-        if (q.includes('blood pressure') || q.includes('hypertension') || q.includes('bp')) {
+        if (q.includes('blood pressure') || q.includes('hypertension') || /\b(bp)\b/i.test(q)) {
             return "Optimal BP: <120/80. Elevated: 120-129/<80. Stage 1 HTN: 130-139/80-89. Stage 2: ≥140/90. First-line: Lifestyle (DASH diet, exercise, weight loss). Pharmacologic: ACE-I/ARB, CCB, thiazide diuretics. Monitor for end-organ damage (retinopathy, nephropathy).";
         }
 
@@ -505,16 +516,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return "ACE Inhibitors (Lisinopril, Enalapril): Block angiotensin II formation. Indications: HTN, HFrEF, post-MI, diabetic nephropathy. SE: Dry cough (10%), hyperkalemia, angioedema (rare). Monitor: K+, Cr, BP. Contraindication: Pregnancy, bilateral renal artery stenosis.";
         }
 
-        // Peptides & Regenerative
-        if (q.includes('bpc-157') || q.includes('bpc')) {
-            return "BPC-157: 15-amino acid gastric peptide. Mechanism: Angiogenesis, collagen synthesis, anti-inflammatory. Uses: Tendon/ligament injuries, gut healing, neuroprotection. Dosing: 250-500mcg SQ/IM BID. Duration: 4-6 weeks. Physician-grade sourcing essential. Not FDA-approved.";
-        }
-        if (q.includes('tb-500') || q.includes('thymosin')) {
-            return "TB-500 (Thymosin Beta-4): Promotes tissue repair, angiogenesis, cell migration. Uses: Acute injuries, chronic inflammation, wound healing. Dosing: 2-5mg SQ 2x/week for 4-6 weeks, then maintenance 2mg/week. Often stacked with BPC-157. Research-only status.";
-        }
-        if (q.includes('cjc-1295') || q.includes('ipamorelin') || q.includes('growth hormone')) {
-            return "CJC-1295/Ipamorelin: GH secretagogue combo. Benefits: Increased lean mass, fat loss, recovery, sleep quality. Dosing: 200-300mcg each, SQ before bed. Contraindications: Active cancer, uncontrolled diabetes. Monitor: IGF-1, glucose, lipids. Requires MD prescription and clearance labs.";
-        }
 
         // Procedures & Diagnostics
         if (q.includes('dexa') || q.includes('bone density')) {
