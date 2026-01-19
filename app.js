@@ -540,7 +540,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Billing & Coding
         if (q.includes('cpt') || q.includes('billing') || q.includes('code')) {
-            return "Common CPT Codes: 99213 (Level 3 office visit, 20-29min), 99214 (Level 4, 30-39min), 99215 (Level 5, 40-54min). Labs: 80053 (CMP), 80061 (Lipid panel), 83036 (HbA1c), 82306 (Vitamin D). Procedures: 77080 (DEXA), 93000 (EKG). Ensure medical necessity documentation.";
+            return "Common CPT Codes:\n" +
+                "• E/M: 99213 (Level 3), 99214 (Level 4), 99215 (Level 5)\n" +
+                "• Cardiovascular: 93000 (EKG), 93010 (EKG report), 93306 (Echo), 95921 (Autonomic Testing)\n" +
+                "• Imaging: 77080 (DEXA), 75571 (CAC Score), 71045 (Chest X-ray)\n" +
+                "• Labs: 80053 (CMP), 80061 (Lipid), 83036 (HbA1c), 82306 (Vit D), 84443 (TSH), 86141 (hs-CRP)\n" +
+                "• Procedures: 96372 (IM Injection), 99401 (Preventive Counseling)\n\n" +
+                "Common DX (ICD-10) Codes:\n" +
+                "• Metabolic: E11.9 (T2DM w/out complications), E78.5 (Hyperlipidemia), E66.9 (Obesity)\n" +
+                "• Cardiovascular: I10 (Essential HTN), I48.91 (AFib), I25.10 (CAD)\n" +
+                "• General: Z00.00 (Adult Medical Exam), M54.50 (Low Back Pain), F41.1 (GAD)";
         }
 
         // Default
@@ -601,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('soap-allergies').innerText = state.history.allergies || "No Known Drug Allergies (NKDA).";
 
             // 3. Medications Table
-        const meds = (state.entities || []).find(e => e.category === 'Medications Found')?.items || [];
+            const meds = (state.entities || []).find(e => e.category === 'Medications Found')?.items || [];
             const medsTable = document.getElementById('soap-meds-table');
             if (meds.length) {
                 let html = `<table class="clinical-table"><thead><tr><th>Medication</th><th>Dose/Freq</th></tr></thead><tbody>`;
@@ -638,8 +647,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('soap-education').innerHTML = ''; // Cleared as included in recsHtml
 
             // 7. Health Maintenance
-        const maintenanceTable = document.getElementById('soap-maintenance-rows');
-        maintenanceTable.innerHTML = `
+            const maintenanceTable = document.getElementById('soap-maintenance-rows');
+            maintenanceTable.innerHTML = `
             <tr><td>Influenza Vaccine</td><td>02/07/2016</td><td>02/07/2017</td><td>Performed</td></tr>
             <tr><td>Urinalysis</td><td>08-16-2015</td><td>08-16-2016</td><td>Performed</td></tr>
             <tr><td>Diabetes, Eye Exam</td><td>07-25-2015</td><td>07-25-2016</td><td>Performed</td></tr>
@@ -650,14 +659,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function checkDataIntegrity() {
-        const gaps = [];
-        if (!state.patient.name) gaps.push('Patient Name');
-        if (!state.patient.dob) gaps.push('Patient DOB');
-        if (!state.vitals.hrv) gaps.push('HRV data');
-        // Add more checks as needed
-        return gaps;
-    }
 
     function renderStructuredRecommendations() {
         const raw = state.rawText.toLowerCase();
@@ -884,15 +885,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (meds.some(m => /Warfarin|Eliquis|Xarelto|Clopidogrel|Aspirin/i.test(m))) {
-                 analysis += `<p><strong>Anticoagulation:</strong> Patient is on blood thinners. Monitor for bleeding risks. Check INR/PT if on Warfarin. Caution with supplements that affect clotting (e.g., high dose Omega-3, Curcumin, Vitamin E).</p>`;
+                analysis += `<p><strong>Anticoagulation:</strong> Patient is on blood thinners. Monitor for bleeding risks. Check INR/PT if on Warfarin. Caution with supplements that affect clotting (e.g., high dose Omega-3, Curcumin, Vitamin E).</p>`;
             }
 
             if (meds.some(m => /Lisinopril|Losartan|Valsartan/i.test(m))) {
-                 analysis += `<p><strong>RAAS Inhibition:</strong> ACE-I/ARB detected. Monitor Potassium (K+) and Renal Function (Creatinine/eGFR). Essential for renal protection in diabetes.</p>`;
+                analysis += `<p><strong>RAAS Inhibition:</strong> ACE-I/ARB detected. Monitor Potassium (K+) and Renal Function (Creatinine/eGFR). Essential for renal protection in diabetes.</p>`;
             }
 
             if (meds.some(m => /Hydrochlorothiazide|Furosemide/i.test(m))) {
-                 analysis += `<p><strong>Diuretic Therapy:</strong> Monitor electrolytes (Na+, K+, Mg2+) regularly. Risk of hypokalemia and dehydration.</p>`;
+                analysis += `<p><strong>Diuretic Therapy:</strong> Monitor electrolytes (Na+, K+, Mg2+) regularly. Risk of hypokalemia and dehydration.</p>`;
             }
         }
 
@@ -911,19 +912,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (labs.hba1c && labs.hba1c > 5.6) {
-             html += `<div class="rec-card"><strong>Fasting Insulin & C-Peptide:</strong> Rationale: HbA1c > 5.6% indicates insulin resistance. Fasting insulin needed to calculate HOMA-IR score.</div>`;
+            html += `<div class="rec-card"><strong>Fasting Insulin & C-Peptide:</strong> Rationale: HbA1c > 5.6% indicates insulin resistance. Fasting insulin needed to calculate HOMA-IR score.</div>`;
         }
 
         if (labs.tsh && labs.tsh > 2.5) {
-             html += `<div class="rec-card"><strong>Full Thyroid Panel (Free T3/T4, TPO):</strong> Rationale: TSH > 2.5 is functionally high. Rule out Hashimoto's auto-immunity.</div>`;
+            html += `<div class="rec-card"><strong>Full Thyroid Panel (Free T3/T4, TPO):</strong> Rationale: TSH > 2.5 is functionally high. Rule out Hashimoto's auto-immunity.</div>`;
+        }
+
+        if (raw.includes('arrhythmia') || raw.includes('palpitation') || raw.includes('afib')) {
+            html += `<div class="rec-card"><strong>12-Lead EKG (CPT 93000) & Holter Monitor (CPT 93224):</strong> Rationale: Reported palpitations/arrhythmia markers warrant electrophysiological baseline (DX: I48.91 or R00.2).</div>`;
+        }
+
+        if (raw.includes('sleep') || raw.includes('snoring') || raw.includes('apnea')) {
+            html += `<div class="rec-card"><strong>Home Sleep Test (CPT 95806):</strong> Rationale: Clinical suspicion of OSA (DX: G47.33). Critical for metabolic and cardiovascular risk management.</div>`;
         }
 
         if (!raw.includes('dna')) {
-            html += `<div class="rec-card"><strong>Pharmacogenomic DNA Panel:</strong> Justification: Optimize medication efficacy (CYP450) and minimize polypharmacy risks.</div>`;
+            html += `<div class="rec-card"><strong>Pharmacogenomic DNA Panel (CPT 81401):</strong> Justification: Optimize medication efficacy (CYP450) and minimize polypharmacy risks.</div>`;
         }
 
         if (!raw.includes('dexa')) {
-            html += `<div class="rec-card"><strong>DEXA Body Scan (CPT 77080):</strong> Rationale: Assess sarcopenia and visceral fat as whole-body inflammation drivers.</div>`;
+            html += `<div class="rec-card"><strong>DEXA Body Scan (CPT 77080):</strong> Rationale: Assess sarcopenia and visceral fat as whole-body inflammation drivers (DX: E66.9).</div>`;
         }
 
         // 2. Lifestyle, Biohacks & Supplements (Research Based)
@@ -972,8 +981,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof pdfjsLib === 'undefined') {
                 throw new Error('PDF.js library not loaded. Check internet connection.');
             }
-            // FORCE DISABLE WORKER for file:// protocol to avoid CORS errors
-            pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+            // Use a proper CDN URL for the PDF worker to ensure it works on Vercel
+            if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            }
 
             const arrayBuffer = await file.arrayBuffer();
             const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -1079,7 +1090,10 @@ document.addEventListener('DOMContentLoaded', () => {
     printBtn.addEventListener('click', () => window.print());
 
     downloadPdfBtn.addEventListener('click', () => {
-        alert('PDF Export: Printing to PDF via browser print is recommended for highest clinical fidelity. Opening print dialog...');
+        const isDark = document.body.classList.contains('dark-mode');
+        if (isDark) {
+            alert('Pro Tip: For the most professional clinical report, disable "Dark Mode" before printing to PDF.');
+        }
         window.print();
     });
 });
