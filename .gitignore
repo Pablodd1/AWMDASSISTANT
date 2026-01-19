@@ -1,0 +1,32 @@
+# Ignore node_modules if using npm
+node_modules/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore logs
+*.log
+npm-debug.log*
+
+# Ignore temporary files
+*.tmp
+*.temp
+
+# Ignore build outputs (if added later)
+dist/
+build/
+
+# Ignore environment files
+.env
+.env.local
+
+# Ignore user data (if implementing local storage)
+user-data/
+patient-data/

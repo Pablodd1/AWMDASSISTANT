@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediDoc AI Analyzer</title>
+    <meta name="description"
+        content="Advanced Medical Document Analysis System capable of OCR and detailed data extraction.">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Libraries -->
+    <!-- Mammoth for Word -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="glass-header">
+            <div class="logo">
+                <span class="icon">🩺</span>
+                <h1>American Wellness <span class="highlight">MD Assistant</span></h1>
+            </div>
+            <div class="header-actions">
+                <div class="view-tabs" id="view-tabs">
+                    <button class="tab-btn active" data-view="upload">Upload</button>
+                    <button class="tab-btn" data-view="dashboard" id="nav-dashboard">Dashboard</button>
+                    <button class="tab-btn" data-view="soap" id="nav-soap">SOAP Note</button>
+                </div>
+                <button id="theme-toggle" class="icon-btn" title="Toggle Theme">🌗</button>
+            </div>
+        </header>
+
+        <main id="main-content">
+            <!-- View 1: Upload (Default) -->
+            <section id="view-upload" class="view-content active">
+                <div class="hero-section">
+                    <h2>Advanced Medical Intelligence</h2>
+                    <p>High-fidelity clinical extraction, wearable synthesis, and professional SOAP generation.</p>
+                </div>
+
+                <div class="upload-section glass-panel">
+                    <div class="drop-zone" id="drop-zone">
+                        <div class="icon-large">🏥</div>
+                        <h3>Upload Patient Document</h3>
+                        <p class="sub-text">PDF, DOCX supported • OCR enabled</p>
+                        <input type="file" id="file-input" accept=".pdf,.docx,.doc" hidden>
+                        <button class="btn-primary" onclick="document.getElementById('file-input').click()">Start
+                            Analysis</button>
+                        <div id="status-text" class="status-msg mt-1"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View 2: Dashboard (Data Synthesis) -->
+            <section id="view-dashboard" class="view-content">
+                <div class="dashboard-grid">
+                    <!-- Left: Extraction Results -->
+                    <div class="glass-panel extraction-panel">
+                        <div class="panel-header">
+                            <h3>Raw Clinical Extraction</h3>
+                        </div>
+                        <div id="extracted-text" class="scrollable-content terminal-style"></div>
+                    </div>
+
+                    <!-- Right: Wearables & Vitals -->
+                    <div class="glass-panel data-entry-panel">
+                        <div class="panel-header">
+                            <h3>Patient Demographics</h3>
+                        </div>
+                        <div class="demographics-grid">
+                            <div class="field">
+                                <label>Full Name</label>
+                                <input type="text" id="p-name" placeholder="">
+                            </div>
+                            <div class="field">
+                                <label>DOB</label>
+                                <input type="text" id="p-dob" placeholder="">
+                            </div>
+                            <div class="field">
+                                <label>Age</label>
+                                <input type="number" id="p-age" placeholder="">
+                            </div>
+                            <div class="field">
+                                <label>Sex</label>
+                                <select id="p-sex">
+                                    <option value="">--</option>
+                                    <option value="M">Male</option>
+                                    <option value="F">Female</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Provider Name</label>
+                                <input type="text" id="p-provider" placeholder="">
+                            </div>
+                            <div class="field">
+                                <label>Chart # / ID</label>
+                                <input type="text" id="p-chart" placeholder="">
+                            </div>
+                        </div>
+
+                        <div class="panel-header mt-1">
+                            <h3>Chief Complaint & HPI</h3>
+                        </div>
+                        <div class="field">
+                            <label>Chief Complaint</label>
+                            <input type="text" id="p-complaint" placeholder="">
+                        </div>
+                        <div class="field">
+                            <label>History of Present Illness (HPI)</label>
+                            <div class="voice-controls">
+                                <button class="btn-icon-pulse" id="start-voice"
+                                    title="Start Voice Dictation">🎤</button>
+                                <span id="voice-status" class="status-indicator">Idle</span>
+                            </div>
+                            <textarea id="doctor-note" placeholder=""></textarea>
+                        </div>
+                        <div class="panel-header mt-1">
+                            <h3>Vitals & Wearables</h3>
+                            <button class="btn-sm" id="sync-wearables">Add Patient Data</button>
+                        </div>
+                        <div class="vitals-grid">
+                            <div class="vital-card" id="card-hr">
+                                <label>HR (Avg)</label>
+                                <input type="number" id="v-hr" placeholder="">
+                            </div>
+                            <div class="vital-card" id="card-hrv">
+                                <label>HRV</label>
+                                <input type="number" id="v-hrv" placeholder="">
+                            </div>
+                            <div class="vital-card" id="card-bp">
+                                <label>BP</label>
+                                <input type="text" id="v-bp" placeholder="">
+                            </div>
+                            <div class="vital-card" id="card-spo2">
+                                <label>SpO2</label>
+                                <input type="number" id="v-spo2" placeholder="">
+                            </div>
+                        </div>
+
+                        <div class="panel-header mt-1">
+                            <h3>Full Clinical History</h3>
+                        </div>
+                        <div class="history-inputs">
+                            <div class="field">
+                                <label>Medical History</label>
+                                <textarea id="h-medical" placeholder=""></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Surgical History</label>
+                                <textarea id="h-surgical" placeholder=""></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Family History</label>
+                                <textarea id="h-family" placeholder=""></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Social History / Smoking</label>
+                                <input type="text" id="h-social" placeholder="">
+                            </div>
+                            <div class="field">
+                                <label>Allergies (Drug & Food)</label>
+                                <input type="text" id="h-allergies" placeholder="">
+                            </div>
+                        </div>
+
+                        <div class="panel-header mt-1">
+                            <h3>Blood Work & Specialty Panels</h3>
+                        </div>
+                        <div class="labs-list" id="labs-list"></div>
+                        <button class="btn-secondary btn-full" id="add-lab">+ Add Lab/Marker</button>
+                    </div>
+                </div>
+            </section>
+    </div>
+    </div>
+    </section>
+
+    <!-- View 3: Professional SOAP Note -->
+    <section id="view-soap" class="view-content">
+        <div class="soap-action-bar">
+            <div class="status-badge">Professional Draft</div>
+            <div class="soap-tools">
+                <button class="btn-secondary" id="print-soap">🖨️ Print / Fax</button>
+                <button class="btn-secondary" id="download-word">📝 Word Doc</button>
+                <button class="btn-primary" id="download-pdf">📥 PDF Report</button>
+            </div>
+        </div>
+
+        <div class="soap-document" id="soap-document">
+            <div class="printable-header">
+                <div class="clinic-branding">
+                    <span class="caduceus">⚕️</span>
+                    <h2>American Wellness</h2>
+                    <p>2845 S. Federal Hwy Suite 211</p>
+                    <p>Boynton Beach, FL 33435-2677</p>
+                    <p>ph: (561) 508-8440 fax: (561) 771-1722</p>
+                </div>
+                <div class="patient-info-grid">
+                    <div class="info-item"><strong>Patient:</strong> <span id="soap-p-name">--</span></div>
+                    <div class="info-item"><strong>DOB:</strong> <span id="soap-p-dob">--</span></div>
+                    <div class="info-item"><strong>Age:</strong> <span id="soap-p-age">--</span></div>
+                    <div class="info-item"><strong>Sex:</strong> <span id="soap-p-sex">--</span></div>
+                    <div class="info-item"><strong>Chart #:</strong> <span id="soap-p-chart">--</span></div>
+                    <div class="info-item"><strong>Provider:</strong> <span id="soap-p-provider">--</span></div>
+                </div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Chief Complaint :</label>
+                <div id="soap-complaint" class="section-content">None provided.</div>
+            </div>
+
+            <div class="clinical-section">
+                <label>History Of Present Illness :</label>
+                <div id="soap-hpi" class="section-content">No acute history recorded.</div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Medical History :</label>
+                <div id="soap-medical-hx" class="section-content">--</div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Surgical History :</label>
+                <div id="soap-surgical-hx" class="section-content">--</div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Family History :</label>
+                <div id="soap-family-hx" class="section-content">--</div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Social History :</label>
+                <div id="soap-social-hx" class="section-content">--</div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Smoking Status :</label>
+                <div id="soap-smoking" class="section-content">Never Smoker.</div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Allergies :</label>
+                <div id="soap-allergies" class="section-content">--</div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Active Medications :</label>
+                <div id="soap-meds-table" class="section-content">
+                    <!-- Integrated Prescription Table -->
+                </div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Assessment :</label>
+                <div id="assessment-codes" class="section-content">
+                    <!-- ICD Numbered List -->
+                </div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Assessment/plan :</label>
+                <div id="assessment-plan" class="section-content">
+                    <!-- Laboratory Follow-up -->
+                </div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Lifestyle & Diet :</label>
+                <div id="soap-lifestyle" class="section-content">
+                    <!-- Dietary & Exercise protocols -->
+                </div>
+            </div>
+
+            <div class="clinical-section" id="peptide-synthesis-section">
+                <label>Advanced Regenerative Protocols :</label>
+                <div id="peptide-content" class="section-content">
+                    <!-- Physician-grade peptides -->
+                </div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Supplements :</label>
+                <div id="soap-supplements" class="section-content">
+                    <!-- OTC Protocols -->
+                </div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Monitoring & Screening :</label>
+                <div id="soap-monitoring" class="section-content">
+                    <!-- Lab rechecks -->
+                </div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Education :</label>
+                <div id="soap-education" class="section-content">
+                    <!-- Patient handouts -->
+                </div>
+            </div>
+
+            <div class="clinical-section">
+                <label>Health Maintenance/Future Tests :</label>
+                <div class="section-content">
+                    <table class="clinical-table">
+                        <thead>
+                            <tr>
+                                <th>Exam Name</th>
+                                <th>Last Date</th>
+                                <th>Due Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="soap-maintenance-rows">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="printable-footer">
+                <p><strong>Provider:</strong> <span id="soap-footer-provider">--</span></p>
+            </div>
+        </div>
+
+        <!-- Floating Code Editor -->
+        <div class="code-editor-panel glass-panel">
+            <h4>Clinical Coding (DX/CPT)</h4>
+            <div class="code-list" id="code-list"></div>
+            <div class="code-input-row">
+                <input type="text" id="new-code" placeholder="Code (e.g. E11.9)">
+                <input type="text" id="new-code-desc" placeholder="Description">
+                <button id="add-code-btn">Add</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Floating Medical Chatbot (Med-Consult) -->
+    <div class="chat-toggle" id="chat-toggle" title="Med-Consult Assistant">💬</div>
+    <div class="chat-panel glass-panel" id="chat-panel" style="display: none;">
+        <div class="chat-header">
+            <h4>Med-Consult AI</h4>
+            <button class="btn-close" id="close-chat">×</button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="msg system">Welcome, Doctor. Ask any medical related questions based on our US database.
+            </div>
+        </div>
+        <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="Type clinical query...">
+            <button id="send-chat">Send</button>
+        </div>
+    </div>
+
+    </main>
+
+    <footer class="glass-footer">
+        <p>American Wellness MD Assistant v2.0 • HIPAA Compliant Local Processing</p>
+    </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
