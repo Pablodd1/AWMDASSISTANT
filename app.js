@@ -41,7 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const downloadWordBtn = document.getElementById('download-word');
 
     // App State
-    let state = {
+    const savedState = localStorage.getItem('mediDocState');
+    let state = savedState ? JSON.parse(savedState) : {
         rawText: '',
         patient: { name: '', dob: '', age: '', sex: '', chart: 'AW-7742', provider: 'Andre Bezerra, APRN' },
         history: {
@@ -59,6 +60,37 @@ document.addEventListener('DOMContentLoaded', () => {
         ],
         analysis: null
     };
+
+    function saveState() {
+        localStorage.setItem('mediDocState', JSON.stringify(state));
+    }
+
+    // Initialize UI with state
+    if (savedState) {
+        // Restore demographics
+        if (state.patient.name) document.getElementById('p-name').value = state.patient.name;
+        if (state.patient.dob) document.getElementById('p-dob').value = state.patient.dob;
+        if (state.patient.age) document.getElementById('p-age').value = state.patient.age;
+        if (state.patient.sex) document.getElementById('p-sex').value = state.patient.sex;
+
+        // Restore other fields
+        if (state.history.medical) document.getElementById('h-medical').value = state.history.medical;
+        if (state.history.surgical) document.getElementById('h-surgical').value = state.history.surgical;
+        if (state.history.family) document.getElementById('h-family').value = state.history.family;
+        if (state.history.social) document.getElementById('h-social').value = state.history.social;
+        if (state.history.allergies) document.getElementById('h-allergies').value = state.history.allergies;
+        if (state.history.complaint) document.getElementById('p-complaint').value = state.history.complaint;
+
+        if (state.vitals.hr) document.getElementById('v-hr').value = state.vitals.hr;
+        if (state.vitals.hrv) document.getElementById('v-hrv').value = state.vitals.hrv;
+        if (state.vitals.bp) document.getElementById('v-bp').value = state.vitals.bp;
+        if (state.vitals.spo2) document.getElementById('v-spo2').value = state.vitals.spo2;
+
+        if (state.patient.provider) document.getElementById('p-provider').value = state.patient.provider;
+        if (state.patient.chart) document.getElementById('p-chart').value = state.patient.chart;
+
+        if (state.codes.length > 0) renderCodes();
+    }
 
     // --- Tab Management ---
     viewTabs.forEach(tab => {
@@ -109,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Auto-extract demographics
             const demographics = extractDemographics(text);
             Object.assign(state.patient, demographics);
+            saveState();
 
             // Auto-populate dashboard
             if (state.patient.name) document.getElementById('p-name').value = state.patient.name;
@@ -130,8 +163,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function extractDemographics(text) {
-        // Simple regex-based demographic extraction
-        const nameMatch = text.match(/(?:Name|Patient):\s*([A-Za-z\s]{5,30})/i);
+        // Improved regex-based demographic extraction
+        // Capture until end of line to avoid grabbing subsequent fields
+        const nameMatch = text.match(/(?:Name|Patient):\s*([^\n\r]+)/i);
         const dobMatch = text.match(/(?:DOB|Date of Birth):\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
         const ageMatch = text.match(/(?:Age):\s*(\d{1,3})/i);
         const sexMatch = text.match(/(?:Sex|Gender):\s*(M|F|Male|Female|Other)/i);
@@ -143,13 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sexMatch) demographics.sex = sexMatch[1].trim().charAt(0).toUpperCase();
 
         return demographics;
-    }
-
-    function updateDemographicsUI() {
-        document.getElementById('p-name').value = state.patient.name;
-        document.getElementById('p-dob').value = state.patient.dob;
-        document.getElementById('p-age').value = state.patient.age;
-        document.getElementById('p-sex').value = state.patient.sex;
     }
 
     // --- Vitals & History Sync ---
@@ -166,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (id.startsWith('p-')) state.patient[id.split('-')[1]] = el.value;
                 if (id.startsWith('v-')) state.vitals[id.split('-')[1]] = el.value;
                 if (id.startsWith('h-')) state.history[id.split('-')[1]] = el.value;
+                saveState();
             });
         }
     });
@@ -395,6 +423,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Lifestyle & Biohacks
+        if (q.includes('sleep') || q.includes('apnea') || q.includes('cpap')) {
+            return "Sleep Apnea (OSA): Defined by AHI > 5. Symptoms: Snoring, daytime fatigue, morning headaches. Risks: HTN, AFib, Stroke, insulin resistance. Diagnosis: Home sleep test or PSG (CPT 95810). Treatment: CPAP, oral appliance, weight loss, position therapy.";
+        }
         if (q.includes('zone 2') || q.includes('cardio') || q.includes('aerobic')) {
             return "Zone 2 Training: Aerobic exercise at 60-70% max HR (conversational pace). Benefits: Mitochondrial biogenesis, fat oxidation, metabolic flexibility, VO2max improvement. Prescription: 150-180 min/week. Modalities: Cycling, rowing, incline walking. Monitor via HR or lactate (2mmol/L).";
         }
@@ -716,8 +747,20 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis += `<p>💊 <strong>Medication Impact:</strong> Beta-blocker detected. Caution: This suppresses HR/HRV response. Autonomic data should be interpreted with medication-adjusted baseline.</p>`;
         }
 
-        if (meds.some(m => /Statin|Atorvastatin|Lipitor/i.test(m))) {
-            analysis += `<p>🛡️ <strong>Lipid Therapy:</strong> Statin use noted. Ensure CoQ10 levels and Liver enzymes (ALT/AST) are monitored annually.</p>`;
+        if (meds.some(m => /Statin|Atorvastatin|Lipitor|Rosuvastatin|Simvastatin/i.test(m))) {
+            analysis += `<p>🛡️ <strong>Lipid Therapy:</strong> Statin use noted. Ensure CoQ10 levels and Liver enzymes (ALT/AST) are monitored annually. CoQ10 depletion is a common side effect.</p>`;
+        }
+
+        if (meds.some(m => /Warfarin|Eliquis|Xarelto|Clopidogrel|Aspirin/i.test(m))) {
+             analysis += `<p>🩸 <strong>Anticoagulation:</strong> Patient is on blood thinners. Monitor for bleeding risks. Check INR/PT if on Warfarin. Caution with supplements that affect clotting (e.g., high dose Omega-3, Curcumin, Vitamin E).</p>`;
+        }
+
+        if (meds.some(m => /Lisinopril|Losartan|Valsartan/i.test(m))) {
+             analysis += `<p>🫀 <strong>RAAS Inhibition:</strong> ACE-I/ARB detected. Monitor Potassium (K+) and Renal Function (Creatinine/eGFR). Essential for renal protection in diabetes.</p>`;
+        }
+
+        if (meds.some(m => /Hydrochlorothiazide|Furosemide/i.test(m))) {
+             analysis += `<p>💧 <strong>Diuretic Therapy:</strong> Monitor electrolytes (Na+, K+, Mg2+) regularly. Risk of hypokalemia and dehydration.</p>`;
         }
 
         return analysis;
@@ -811,11 +854,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function performMedicalAnalysis(text) {
         const entities = [];
-        const medRegex = /\b(Aspirin|Metformin|Lisinopril|Atorvastatin|Amlodipine|Metoprolol|Albuterol|Omeprazole|Warfarin|Levothyroxine)\b/gi;
+        // Expanded medication list (Top 30 prescribed + common)
+        const medRegex = /\b(Aspirin|Metformin|Lisinopril|Atorvastatin|Amlodipine|Metoprolol|Albuterol|Omeprazole|Warfarin|Levothyroxine|Simvastatin|Losartan|Gabapentin|Hydrochlorothiazide|Sertraline|Furosemide|Pantoprazole|Prednisone|Ibuprofen|Tylenol|Eliquis|Xarelto|Insulin|Glipizide|Rosuvastatin|Clopidogrel|Montelukast|Escitalopram|Bupropion|Amphetamine)\b/gi;
         const meds = [...new Set(text.match(medRegex) || [])];
         if (meds.length) entities.push({ category: 'Medications Found', items: meds });
 
-        const dxRegex = /\b(Hypertension|Diabetes|Asthma|COPD|Arthritis|Anxiety|Depression|Obesity|Hypothyroidism)\b/gi;
+        // Expanded diagnosis list
+        const dxRegex = /\b(Hypertension|Diabetes|Asthma|COPD|Arthritis|Anxiety|Depression|Obesity|Hypothyroidism|Hyperlipidemia|GERD|Sleep Apnea|Insomnia|Migraine|Back Pain|Osteoporosis|Kidney Disease|CKD|Heart Failure|CHF|Arrhythmia|Atrial Fibrillation|AFib|Stroke|TIA|Neuropathy|Dementia|Alzheimer|Cancer)\b/gi;
         const diagnoses = [...new Set(text.match(dxRegex) || [])];
         if (diagnoses.length) entities.push({ category: 'Symptoms Found', items: diagnoses });
 

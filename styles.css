@@ -209,6 +209,12 @@ main {
     gap: 2rem;
 }
 
+@media (max-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .glass-panel {
     background: var(--bg-panel);
     border-radius: 12px;
