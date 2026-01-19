@@ -47,7 +47,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // App State
     const savedState = localStorage.getItem('mediDocState');
-    let state = savedState ? JSON.parse(savedState) : {
+    let state = null;
+    try {
+        state = savedState ? JSON.parse(savedState) : null;
+    } catch (e) {
+        console.error("Corrupt state cleared", e);
+        localStorage.removeItem('mediDocState');
+    }
+
+    if (!state) state = {
         rawText: '',
         patient: { name: '', dob: '', age: '', sex: '', chart: 'AW-7742', provider: 'Andre Bezerra, APRN' },
         history: {
@@ -70,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Functional Medicine Logic ---
     const FUNCTIONAL_RANGES = {
         tsh: { min: 1.0, max: 2.5, unit: 'mIU/L', label: 'Thyroid (TSH)', low: "Hyperthyroid Pattern", high: "Subclinical Hypothyroid Pattern" },
-        vit_d: { min: 50, max: 80, unit: 'ng/mL', label: 'Vitamin D (25-OH)', low: "Suboptimal (<50)", high: "Potential Toxicity" },
+        vit_d: { min: 50, max: 100, unit: 'ng/mL', label: 'Vitamin D (25-OH)', low: "Suboptimal (<50)", high: "Potential Toxicity (>100)" },
         hba1c: { min: 4.5, max: 5.3, unit: '%', label: 'HbA1c', low: "Hypoglycemia Risk", high: "Insulin Resistance (>5.3)" },
         hdl: { min: 55, max: 100, unit: 'mg/dL', label: 'HDL Cholesterol', low: "Metabolic Risk", high: "Optimal" },
         ldl: { min: 0, max: 100, unit: 'mg/dL', label: 'LDL Cholesterol', low: "Optimal", high: "Atherogenic Risk (>100)" },
@@ -88,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const patterns = {
             tsh: /(?:TSH|Thyroid Stimulating Hormone)[^\d]*(\d+\.?\d*)/i,
-            vit_d: /(?:Vitamin D|Vit D|25-OH)[^\d]*(\d{2,3})/i,
+            vit_d: /(?:Vitamin D|Vit D|25-OH)(?:[^\d]*25-OH)?[^\d]*(\d{2,3})/i,
             hba1c: /(?:HbA1c|Hemoglobin A1c)[^\d]*(\d\.?\d?)/i,
             hdl: /(?:HDL|High Density Lipoprotein)[^\d]*(\d{2,3})/i,
             ldl: /(?:LDL|Low Density Lipoprotein)[^\d]*(\d{2,3})/i,
@@ -117,13 +125,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let status = "Optimal";
             let isRisk = false;
+            let color = "green";
 
             if (value < range.min) {
                 status = range.low;
                 isRisk = true;
+                color = "red";
             } else if (value > range.max) {
                 status = range.high;
                 isRisk = true;
+                color = "red";
             }
 
             if (isRisk) {
@@ -132,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     value: value,
                     unit: range.unit,
                     status: status,
+                    color: color,
                     target: `${range.min}-${range.max}`
                 });
             }
@@ -245,8 +257,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function extractDemographics(text) {
         // Improved regex-based demographic extraction
-        // Capture until end of line to avoid grabbing subsequent fields
-        const nameMatch = text.match(/(?:Name|Patient):\s*([^\n\r]+)/i);
+        // Capture until end of line or next keyword to avoid grabbing subsequent fields
+        const nameMatch = text.match(/(?:Name|Patient):\s*([^\n\r]+?)(?=\s+(?:DOB|Date|Age|Sex|Gender|Chart|Provider)|$)/i);
         const dobMatch = text.match(/(?:DOB|Date of Birth):\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
         const ageMatch = text.match(/(?:Age):\s*(\d{1,3})/i);
         const sexMatch = text.match(/(?:Sex|Gender):\s*(M|F|Male|Female|Other)/i);
@@ -979,8 +991,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusText.textContent = `Extracting text form page ${i} of ${totalPages}...`;
                 const page = await pdf.getPage(i);
                 const content = await page.getTextContent();
-                // Improved joining logic to prevent words mashing
-                const pageText = content.items.map(item => item.str + (item.str.endsWith(' ') ? '' : ' ')).join('');
+
+                // Reconstruct text with structural awareness (Y-coordinate sorting)
+                const items = content.items;
+                // Basic structural reconstruction
+                let lastY = -1;
+                let pageText = '';
+
+                // Sort by Y (descending) then X (ascending) to handle columnar or scattered text better?
+                // Actually PDF.js usually gives stream order. Let's trust stream order but insert newlines.
+
+                for (const item of items) {
+                    const y = item.transform[5];
+                    // If Y changes significantly (>10 units), assume new line
+                    if (lastY !== -1 && Math.abs(y - lastY) > 10) {
+                        pageText += '\n';
+                    }
+                    pageText += item.str;
+                    // Add space if not ending with one
+                    if (!item.str.endsWith(' ')) {
+                        pageText += ' ';
+                    }
+                    lastY = y;
+                }
+
                 text += `--- Page ${i} ---\n${pageText}\n`;
             }
             return text;
@@ -1018,26 +1052,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Theme Toggle Logic ---
-    themeToggleBtn.addEventListener('click', () => {
-        document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        themeToggleBtn.innerText = isDark ? '☀️' : '🌗';
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            themeToggleBtn.innerText = isDark ? '☀️' : '🌗';
 
-        // Dynamic styles for Dark Mode (minimal implementation)
-        if (isDark) {
-            document.documentElement.style.setProperty('--bg-page', '#0f172a');
-            document.documentElement.style.setProperty('--bg-panel', '#1e293b');
-            document.documentElement.style.setProperty('--text-main', '#f1f5f9');
-            document.documentElement.style.setProperty('--text-muted', '#94a3b8');
-            document.documentElement.style.setProperty('--border-light', '#334155');
-        } else {
-            document.documentElement.style.setProperty('--bg-page', '#f8fafc');
-            document.documentElement.style.setProperty('--bg-panel', '#ffffff');
-            document.documentElement.style.setProperty('--text-main', '#1e293b');
-            document.documentElement.style.setProperty('--text-muted', '#64748b');
-            document.documentElement.style.setProperty('--border-light', '#e2e8f0');
-        }
-    });
+            // Dynamic styles for Dark Mode (minimal implementation)
+            if (isDark) {
+                document.documentElement.style.setProperty('--bg-page', '#0f172a');
+                document.documentElement.style.setProperty('--bg-panel', '#1e293b');
+                document.documentElement.style.setProperty('--text-main', '#f1f5f9');
+                document.documentElement.style.setProperty('--text-muted', '#94a3b8');
+                document.documentElement.style.setProperty('--border-light', '#334155');
+            } else {
+                document.documentElement.style.setProperty('--bg-page', '#f8fafc');
+                document.documentElement.style.setProperty('--bg-panel', '#ffffff');
+                document.documentElement.style.setProperty('--text-main', '#1e293b');
+                document.documentElement.style.setProperty('--text-muted', '#64748b');
+                document.documentElement.style.setProperty('--border-light', '#e2e8f0');
+            }
+        });
+    }
 
     // --- Export Logic ---
     printBtn.addEventListener('click', () => window.print());
