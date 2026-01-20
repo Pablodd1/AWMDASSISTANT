@@ -478,29 +478,62 @@ document.addEventListener('DOMContentLoaded', () => {
     sendChatBtn.addEventListener('click', handleChat);
     chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleChat(); });
 
-    function handleChat() {
+    async function handleChat() {
         const query = chatInput.value.trim();
         if (!query) return;
 
         addChatMessage('user', query);
         chatInput.value = '';
 
-        // Simulate Clinical Database Search
-        setTimeout(() => {
-            let response = "I'm sorry, I couldn't process that request.";
-            if (typeof MedicalKnowledge !== 'undefined') {
-                response = MedicalKnowledge.getResponse(query);
+        // Show typing indicator
+        const typingId = 'typing-' + Date.now();
+        addChatMessage('bot typing', 'Med-Consult AI is analyzing...', typingId);
+
+        try {
+            const context = state.rawText;
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, context })
+            });
+            const data = await res.json();
+
+            // Remove typing indicator
+            const typingMsg = document.getElementById(typingId);
+            if (typingMsg) typingMsg.remove();
+
+            if (data.response) {
+                addChatMessage('bot', data.response);
             } else {
-                response = "Medical Knowledge Base not loaded. Please refresh.";
+                throw new Error(data.error || 'Unknown error');
             }
-            addChatMessage('bot', response);
-        }, 800);
+        } catch (error) {
+            console.error('Chat Error:', error);
+            const typingMsg = document.getElementById(typingId);
+            if (typingMsg) typingMsg.remove();
+
+            // Fallback to local knowledge
+            const response = getMedicalResponse(query);
+            addChatMessage('bot', response + "\n\n(Note: Using local knowledge base due to connectivity)");
+        }
     }
 
-    function addChatMessage(role, text) {
+    // Helper for local knowledge fallback
+    function getMedicalResponse(query) {
+        let response = "I'm sorry, I couldn't process that request.";
+        if (typeof MedicalKnowledge !== 'undefined') {
+            response = MedicalKnowledge.getResponse(query);
+        } else {
+            response = "Medical Knowledge Base not loaded. Please refresh.";
+        }
+        return response;
+    }
+
+    function addChatMessage(role, text, id = null) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `msg ${role}`;
-        msgDiv.textContent = text; // Safe text insertion
+        if (id) msgDiv.id = id;
+        msgDiv.innerText = text; // Safe text insertion
         chatMessages.appendChild(msgDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
