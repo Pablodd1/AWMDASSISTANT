@@ -1,6 +1,15 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 module.exports = async (req, res) => {
+    // Enable CORS for testing if needed, though same-origin on Vercel
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
@@ -9,7 +18,10 @@ module.exports = async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-        return res.status(500).json({ error: 'Gemini API Key is not configured on Vercel.' });
+        console.error("Missing GEMINI_API_KEY environment variable");
+        return res.status(503).json({
+            error: 'Configuration Error: Gemini API Key is missing on the server. Please check Vercel Environment Variables.'
+        });
     }
 
     try {
@@ -38,6 +50,8 @@ module.exports = async (req, res) => {
         res.status(200).json({ response: text });
     } catch (error) {
         console.error('Gemini API Error:', error);
-        res.status(500).json({ error: 'Failed to generate response from AI.' });
+        // Clean error message for frontend
+        const message = error.message || 'Unknown API failure';
+        res.status(500).json({ error: `AI Processing Failed: ${message}` });
     }
 };
