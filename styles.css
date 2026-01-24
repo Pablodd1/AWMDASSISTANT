@@ -332,13 +332,41 @@ select:focus {
 }
 
 /* --- Buttons --- */
-.btn-sm {
-    background: white;
-    border: 1px solid var(--border-light);
-    padding: 0.4rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
+.btn-primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
     cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px -1px rgba(2, 132, 199, 0.15);
+}
+
+.btn-sm {
+    background: var(--bg-panel);
+    color: var(--text-main);
+    border: 1px solid var(--border-light);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.create-btn {
+    background: linear-gradient(135deg, #059669 0%, #0284c7 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    font-size: 16px;
+    box-shadow: 0 4px 12px -1px rgba(5, 150, 105, 0.2);
 }
 
 .btn-secondary {
@@ -375,6 +403,55 @@ select:focus {
     background: #fee2e2;
     color: #ef4444;
     animation: pulse 1.5s infinite;
+}
+
+/* --- Status Indicators --- */
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 8px;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.idle {
+    background-color: #6b7280;
+}
+
+.status-indicator.recording {
+    background-color: #ef4444;
+    animation: pulse 1.5s infinite;
+}
+
+/* --- Visual Feedback --- */
+.required-field {
+    border: 2px dashed #ef4444;
+    background-color: #fef2f2;
+    transition: all 0.3s ease;
+}
+
+.required-field:focus {
+    border-color: #dc3545;
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.success-highlight {
+    border-left: 4px solid #10b981;
+    background-color: #f0f9ff;
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }
 
 @keyframes pulse {
