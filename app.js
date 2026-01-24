@@ -710,7 +710,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             document.getElementById('soap-allergies').innerText = state.history.allergies || "No Known Drug Allergies (NKDA).";
 
-            // 2.5. Populate Objective/Vitals Section
+    // 2.5. Populate Objective/Vitals Section with Red Flag Analysis
+            const redFlags = analyzeVitalsForRedFlags(state.vitals);
             const vitalsHtml = `
                 <p><strong>Vital Signs:</strong></p>
                 <ul>
@@ -719,6 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <li><strong>Blood Pressure (BP):</strong> ${state.vitals.bp || '--'} mmHg</li>
                     <li><strong>Oxygen Saturation (SpO2):</strong> ${state.vitals.spo2 || '--'}%</li>
                 </ul>
+                ${redFlags.length > 0 ? `<div class="red-flag-section"><h4>⚠️ Clinical Alerts:</h4><ul>${redFlags.map(flag => `<li>${flag}</li>`).join('')}</ul></div>` : ''}
                 ${state.vitals.hrv && state.vitals.hrv < 40 ? '<p><em>⚠️ Note: Low HRV detected, indicating potential autonomic stress or poor recovery.</em></p>' : ''}
                 ${state.vitals.spo2 && state.vitals.spo2 < 95 ? '<p><em>⚠️ Note: Low SpO2 detected, consider pulmonary evaluation.</em></p>' : ''}
             `;
