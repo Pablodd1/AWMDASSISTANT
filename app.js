@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const vBP = document.getElementById('v-bp');
     const vSPO2 = document.getElementById('v-spo2');
     const syncWearablesBtn = document.getElementById('sync-wearables');
+    const savePatientBtn = document.getElementById('save-patient');
     const clearDataBtn = document.getElementById('clear-data');
 
     // UI Elements - SOAP
@@ -329,14 +330,61 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     syncWearablesBtn.addEventListener('click', () => {
-        // Mock sync
+        // Check if any vitals are already filled
+        const hasExistingData =
+            document.getElementById('v-hr').value ||
+            document.getElementById('v-hrv').value ||
+            document.getElementById('v-bp').value ||
+            document.getElementById('v-spo2').value;
+
+        if (hasExistingData) {
+            if (!confirm('Some vitals data already exists. Do you want to overwrite it with mock data?')) {
+                return;
+            }
+        }
+
+        // Mock sync - only fill if empty or user confirmed
         document.getElementById('v-hr').value = 62;
         document.getElementById('v-hrv').value = 58;
         document.getElementById('v-bp').value = "118/76";
         document.getElementById('v-spo2').value = 99;
+
+        // Update state
         state.vitals = { hr: 62, hrv: 58, bp: "118/76", spo2: 99 };
-        showToast('Data synced from Oura/Apple Health (Mock)', 'success');
+
+        // Trigger input events to save state
+        ['v-hr', 'v-hrv', 'v-bp', 'v-spo2'].forEach(id => {
+            document.getElementById(id).dispatchEvent(new Event('input', { bubbles: true }));
+        });
+
+        saveState();
+        showToast('Mock vitals data synced from Oura/Apple Health', 'success');
     });
+
+    // Save Patient Button - Explicit save with validation
+    if (savePatientBtn) {
+        savePatientBtn.addEventListener('click', () => {
+            // Validate required fields
+            const flags = checkDataIntegrity();
+
+            if (flags.length > 0) {
+                const proceed = confirm(`⚠️ Warning: Missing data detected:\n\n${flags.join('\n')}\n\nDo you want to save anyway?`);
+                if (!proceed) return;
+            }
+
+            // Save state
+            saveState();
+
+            // Show success message
+            showToast(`✓ Patient record saved: ${state.patient.name || 'Unnamed Patient'}`, 'success');
+
+            // Optional: Highlight the save button briefly
+            savePatientBtn.style.background = '#059669';
+            setTimeout(() => {
+                savePatientBtn.style.background = '#10b981';
+            }, 500);
+        });
+    }
 
     if (clearDataBtn) {
         clearDataBtn.addEventListener('click', () => {
@@ -599,6 +647,20 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('soap-smoking').innerText = smokingStatus;
 
             document.getElementById('soap-allergies').innerText = state.history.allergies || "No Known Drug Allergies (NKDA).";
+
+            // 2.5. Populate Objective/Vitals Section
+            const vitalsHtml = `
+                <p><strong>Vital Signs:</strong></p>
+                <ul>
+                    <li><strong>Heart Rate (HR):</strong> ${state.vitals.hr || '--'} bpm</li>
+                    <li><strong>Heart Rate Variability (HRV):</strong> ${state.vitals.hrv || '--'} ms</li>
+                    <li><strong>Blood Pressure (BP):</strong> ${state.vitals.bp || '--'} mmHg</li>
+                    <li><strong>Oxygen Saturation (SpO2):</strong> ${state.vitals.spo2 || '--'}%</li>
+                </ul>
+                ${state.vitals.hrv && state.vitals.hrv < 40 ? '<p><em>⚠️ Note: Low HRV detected, indicating potential autonomic stress or poor recovery.</em></p>' : ''}
+                ${state.vitals.spo2 && state.vitals.spo2 < 95 ? '<p><em>⚠️ Note: Low SpO2 detected, consider pulmonary evaluation.</em></p>' : ''}
+            `;
+            document.getElementById('soap-vitals').innerHTML = vitalsHtml;
 
             // 3. Medications Table
             const meds = (state.entities || []).find(e => e.category === 'Medications Found')?.items || [];

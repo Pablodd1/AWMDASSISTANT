@@ -128,8 +128,12 @@
                         <div class="panel-header mt-1">
                             <h3>Vitals & Wearables</h3>
                             <div style="display:flex; gap: 10px;">
+                                <button class="btn-sm" id="save-patient"
+                                    style="background: #10b981; color: white; border-color: #10b981;">💾 Save
+                                    Patient</button>
                                 <button class="btn-sm" id="sync-wearables">Add Patient Data</button>
-                                <button class="btn-sm" id="clear-data" style="color: #ef4444; border-color: #ef4444;">Clear Data</button>
+                                <button class="btn-sm" id="clear-data"
+                                    style="color: #ef4444; border-color: #ef4444;">Clear Data</button>
                             </div>
                         </div>
                         <div class="vitals-grid">
@@ -186,190 +190,197 @@
                 </div>
             </section>
 
-    <!-- View 3: Professional SOAP Note -->
-    <section id="view-soap" class="view-content">
-        <div class="soap-action-bar">
-            <div class="status-badge">Professional Draft</div>
-            <div class="soap-tools">
-                <button class="btn-secondary" id="print-soap">🖨️ Print / Fax</button>
-                <button class="btn-secondary" id="download-word">📝 Word Doc</button>
-                <button class="btn-primary" id="download-pdf">📥 PDF Report</button>
-            </div>
-        </div>
-
-        <div class="soap-document" id="soap-document">
-            <div class="printable-header">
-                <div class="clinic-branding">
-                    <span class="caduceus">⚕️</span>
-                    <h2>American Wellness</h2>
-                    <p>2845 S. Federal Hwy Suite 211</p>
-                    <p>Boynton Beach, FL 33435-2677</p>
-                    <p>ph: (561) 508-8440 fax: (561) 771-1722</p>
+            <!-- View 3: Professional SOAP Note -->
+            <section id="view-soap" class="view-content">
+                <div class="soap-action-bar">
+                    <div class="status-badge">Professional Draft</div>
+                    <div class="soap-tools">
+                        <button class="btn-secondary" id="print-soap">🖨️ Print / Fax</button>
+                        <button class="btn-secondary" id="download-word">📝 Word Doc</button>
+                        <button class="btn-primary" id="download-pdf">📥 PDF Report</button>
+                    </div>
                 </div>
-                <div class="patient-info-grid">
-                    <div class="info-item"><strong>Patient:</strong> <span id="soap-p-name">--</span></div>
-                    <div class="info-item"><strong>DOB:</strong> <span id="soap-p-dob">--</span></div>
-                    <div class="info-item"><strong>Age:</strong> <span id="soap-p-age">--</span></div>
-                    <div class="info-item"><strong>Sex:</strong> <span id="soap-p-sex">--</span></div>
-                    <div class="info-item"><strong>Chart #:</strong> <span id="soap-p-chart">--</span></div>
-                    <div class="info-item"><strong>Provider:</strong> <span id="soap-p-provider">--</span></div>
+
+                <div class="soap-document" id="soap-document">
+                    <div class="printable-header">
+                        <div class="clinic-branding">
+                            <span class="caduceus">⚕️</span>
+                            <h2>American Wellness</h2>
+                            <p>2845 S. Federal Hwy Suite 211</p>
+                            <p>Boynton Beach, FL 33435-2677</p>
+                            <p>ph: (561) 508-8440 fax: (561) 771-1722</p>
+                        </div>
+                        <div class="patient-info-grid">
+                            <div class="info-item"><strong>Patient:</strong> <span id="soap-p-name">--</span></div>
+                            <div class="info-item"><strong>DOB:</strong> <span id="soap-p-dob">--</span></div>
+                            <div class="info-item"><strong>Age:</strong> <span id="soap-p-age">--</span></div>
+                            <div class="info-item"><strong>Sex:</strong> <span id="soap-p-sex">--</span></div>
+                            <div class="info-item"><strong>Chart #:</strong> <span id="soap-p-chart">--</span></div>
+                            <div class="info-item"><strong>Provider:</strong> <span id="soap-p-provider">--</span></div>
+                        </div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Chief Complaint :</label>
+                        <div id="soap-complaint" class="section-content">None provided.</div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>History Of Present Illness :</label>
+                        <div id="soap-hpi" class="section-content">No acute history recorded.</div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Medical History :</label>
+                        <div id="soap-medical-hx" class="section-content">--</div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Surgical History :</label>
+                        <div id="soap-surgical-hx" class="section-content">--</div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Family History :</label>
+                        <div id="soap-family-hx" class="section-content">--</div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Social History :</label>
+                        <div id="soap-social-hx" class="section-content">--</div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Smoking Status :</label>
+                        <div id="soap-smoking" class="section-content">Never Smoker.</div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Allergies :</label>
+                        <div id="soap-allergies" class="section-content">--</div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Objective (Vitals) :</label>
+                        <div id="soap-vitals" class="section-content">
+                            <!-- Vitals will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Active Medications :</label>
+                        <div id="soap-meds-table" class="section-content">
+                            <!-- Integrated Prescription Table -->
+                        </div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Assessment :</label>
+                        <div id="assessment-codes" class="section-content">
+                            <!-- ICD Numbered List -->
+                        </div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Assessment/plan :</label>
+                        <div id="assessment-plan" class="section-content">
+                            <!-- Laboratory Follow-up -->
+                        </div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Lifestyle & Diet :</label>
+                        <div id="soap-lifestyle" class="section-content">
+                            <!-- Dietary & Exercise protocols -->
+                        </div>
+                    </div>
+
+                    <div class="clinical-section" id="peptide-synthesis-section">
+                        <label>Advanced Regenerative Protocols :</label>
+                        <div id="peptide-content" class="section-content">
+                            <!-- Physician-grade peptides -->
+                        </div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Supplements :</label>
+                        <div id="soap-supplements" class="section-content">
+                            <!-- OTC Protocols -->
+                        </div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Monitoring & Screening :</label>
+                        <div id="soap-monitoring" class="section-content">
+                            <!-- Lab rechecks -->
+                        </div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Education :</label>
+                        <div id="soap-education" class="section-content">
+                            <!-- Patient handouts -->
+                        </div>
+                    </div>
+
+                    <div class="clinical-section">
+                        <label>Health Maintenance/Future Tests :</label>
+                        <div class="section-content">
+                            <table class="clinical-table">
+                                <thead>
+                                    <tr>
+                                        <th>Exam Name</th>
+                                        <th>Last Date</th>
+                                        <th>Due Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="soap-maintenance-rows">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="printable-footer">
+                        <p><strong>Provider:</strong> <span id="soap-footer-provider">--</span></p>
+                    </div>
+                </div>
+
+                <!-- Floating Code Editor -->
+                <div class="code-editor-panel glass-panel">
+                    <h4>Clinical Coding (DX/CPT)</h4>
+                    <div class="code-list" id="code-list"></div>
+                    <div class="code-input-row">
+                        <input type="text" id="new-code" placeholder="Code (e.g. E11.9)">
+                        <input type="text" id="new-code-desc" placeholder="Description">
+                        <button id="add-code-btn">Add</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Floating Medical Chatbot (Med-Consult) -->
+            <div class="chat-toggle" id="chat-toggle" title="Med-Consult Assistant">💬</div>
+            <div class="chat-panel glass-panel" id="chat-panel" style="display: none;">
+                <div class="chat-header">
+                    <h4>Med-Consult AI</h4>
+                    <button class="btn-close" id="close-chat">×</button>
+                </div>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="msg system">Welcome, Doctor. Ask any medical related questions based on our US database.
+                    </div>
+                </div>
+                <div class="chat-input-row">
+                    <input type="text" id="chat-input" placeholder="Type clinical query...">
+                    <button id="send-chat">Send</button>
                 </div>
             </div>
 
-            <div class="clinical-section">
-                <label>Chief Complaint :</label>
-                <div id="soap-complaint" class="section-content">None provided.</div>
-            </div>
+        </main>
 
-            <div class="clinical-section">
-                <label>History Of Present Illness :</label>
-                <div id="soap-hpi" class="section-content">No acute history recorded.</div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Medical History :</label>
-                <div id="soap-medical-hx" class="section-content">--</div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Surgical History :</label>
-                <div id="soap-surgical-hx" class="section-content">--</div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Family History :</label>
-                <div id="soap-family-hx" class="section-content">--</div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Social History :</label>
-                <div id="soap-social-hx" class="section-content">--</div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Smoking Status :</label>
-                <div id="soap-smoking" class="section-content">Never Smoker.</div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Allergies :</label>
-                <div id="soap-allergies" class="section-content">--</div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Active Medications :</label>
-                <div id="soap-meds-table" class="section-content">
-                    <!-- Integrated Prescription Table -->
-                </div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Assessment :</label>
-                <div id="assessment-codes" class="section-content">
-                    <!-- ICD Numbered List -->
-                </div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Assessment/plan :</label>
-                <div id="assessment-plan" class="section-content">
-                    <!-- Laboratory Follow-up -->
-                </div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Lifestyle & Diet :</label>
-                <div id="soap-lifestyle" class="section-content">
-                    <!-- Dietary & Exercise protocols -->
-                </div>
-            </div>
-
-            <div class="clinical-section" id="peptide-synthesis-section">
-                <label>Advanced Regenerative Protocols :</label>
-                <div id="peptide-content" class="section-content">
-                    <!-- Physician-grade peptides -->
-                </div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Supplements :</label>
-                <div id="soap-supplements" class="section-content">
-                    <!-- OTC Protocols -->
-                </div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Monitoring & Screening :</label>
-                <div id="soap-monitoring" class="section-content">
-                    <!-- Lab rechecks -->
-                </div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Education :</label>
-                <div id="soap-education" class="section-content">
-                    <!-- Patient handouts -->
-                </div>
-            </div>
-
-            <div class="clinical-section">
-                <label>Health Maintenance/Future Tests :</label>
-                <div class="section-content">
-                    <table class="clinical-table">
-                        <thead>
-                            <tr>
-                                <th>Exam Name</th>
-                                <th>Last Date</th>
-                                <th>Due Date</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="soap-maintenance-rows">
-                            <!-- Dynamic rows -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="printable-footer">
-                <p><strong>Provider:</strong> <span id="soap-footer-provider">--</span></p>
-            </div>
-        </div>
-
-        <!-- Floating Code Editor -->
-        <div class="code-editor-panel glass-panel">
-            <h4>Clinical Coding (DX/CPT)</h4>
-            <div class="code-list" id="code-list"></div>
-            <div class="code-input-row">
-                <input type="text" id="new-code" placeholder="Code (e.g. E11.9)">
-                <input type="text" id="new-code-desc" placeholder="Description">
-                <button id="add-code-btn">Add</button>
-            </div>
-        </div>
-    </section>
-
-    <!-- Floating Medical Chatbot (Med-Consult) -->
-    <div class="chat-toggle" id="chat-toggle" title="Med-Consult Assistant">💬</div>
-    <div class="chat-panel glass-panel" id="chat-panel" style="display: none;">
-        <div class="chat-header">
-            <h4>Med-Consult AI</h4>
-            <button class="btn-close" id="close-chat">×</button>
-        </div>
-        <div class="chat-messages" id="chat-messages">
-            <div class="msg system">Welcome, Doctor. Ask any medical related questions based on our US database.
-            </div>
-        </div>
-        <div class="chat-input-row">
-            <input type="text" id="chat-input" placeholder="Type clinical query...">
-            <button id="send-chat">Send</button>
-        </div>
-    </div>
-
-    </main>
-
-    <footer class="glass-footer">
-        <p>American Wellness MD Assistant v2.0 • HIPAA Compliant Local Processing</p>
-    </footer>
+        <footer class="glass-footer">
+            <p>American Wellness MD Assistant v2.0 • HIPAA Compliant Local Processing</p>
+        </footer>
     </div>
 
     <script src="medicalKnowledge.js"></script>
