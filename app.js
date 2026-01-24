@@ -80,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatMessages = document.getElementById('chat-messages');
 
     const downloadWordBtn = document.getElementById('download-word');
+    const createNewPatientBtn = document.getElementById('create-new-patient');
     const themeToggleBtn = document.getElementById('theme-toggle');
 
     // App State
@@ -88,8 +89,55 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         state = savedState ? JSON.parse(savedState) : null;
     } catch (e) {
-        console.error("Corrupt state cleared", e);
+        console.error("Error loading state:", e);
         localStorage.removeItem('mediDocState');
+        showToast('Error loading saved data', 'error', 5000);
+    }
+
+    // Create New Patient functionality
+    if (createNewPatientBtn) {
+        createNewPatientBtn.addEventListener('click', () => {
+            if (confirm('Create new patient record? This will clear all current data.')) {
+                // Clear all patient data
+                state = {
+                    rawText: '',
+                    patient: { name: '', dob: '', age: '', sex: '', chart: 'AW-7742', provider: 'Andre Bezerra, APRN' },
+                    history: {
+                        medical: '',
+                        surgical: '',
+                        family: '',
+                        social: '',
+                        allergies: '',
+                        complaint: ''
+                    },
+                    entities: [],
+                    labs: {},
+                    vitals: { hr: 0, hrv: 0, bp: '', spo2: 0 },
+                    codes: [
+                        { code: 'Z00.00', desc: 'Encounter for general adult medical examination', justification: 'Standard baseline assessment code.' }
+                    ],
+                    analysis: null
+                };
+                
+                // Clear form fields
+                ['p-name', 'p-dob', 'p-age', 'p-sex', 'p-provider', 'p-chart'].forEach(id => {
+                    document.getElementById(id).value = '';
+                });
+                
+                // Clear extracted text
+                document.getElementById('extracted-text').innerHTML = '';
+                
+                // Switch to dashboard view
+                viewTabs.forEach(tab => tab.classList.remove('active'));
+                viewContents.forEach(content => content.classList.remove('active'));
+                
+                document.getElementById('nav-dashboard').classList.add('active');
+                document.getElementById('view-dashboard').classList.add('active');
+                
+                saveState();
+                showToast('New patient record created', 'success');
+            }
+        });
     }
 
     if (!state) state = {
@@ -189,7 +237,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveState() {
-        localStorage.setItem('mediDocState', JSON.stringify(state));
+        try {
+            localStorage.setItem('mediDocState', JSON.stringify(state));
+            console.log('State saved:', state);
+            showToast('Patient data saved successfully!', 'success', 3000);
+        } catch (e) {
+            console.error("Error saving state:", e);
+            showToast('Error saving patient data', 'error', 5000);
+        }
     }
 
     // Initialize UI with state
@@ -330,34 +385,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     syncWearablesBtn.addEventListener('click', () => {
-        // Check if any vitals are already filled
-        const hasExistingData =
-            document.getElementById('v-hr').value ||
-            document.getElementById('v-hrv').value ||
-            document.getElementById('v-bp').value ||
-            document.getElementById('v-spo2').value;
-
-        if (hasExistingData) {
-            if (!confirm('Some vitals data already exists. Do you want to overwrite it with mock data?')) {
-                return;
-            }
+        // Only sync if vitals are empty or user confirms
+        const currentVitals = state.vitals || { hr: 0, hrv: 0, bp: '', spo2: 0 };
+        const hasExistingData = currentVitals.hr > 0 || currentVitals.hrv > 0;
+        
+        if (!hasExistingData) {
+            showToast('No existing wearable data to overwrite. Enter vitals manually.', 'warning');
+            return;
         }
 
-        // Mock sync - only fill if empty or user confirmed
-        document.getElementById('v-hr').value = 62;
-        document.getElementById('v-hrv').value = 58;
-        document.getElementById('v-bp').value = "118/76";
-        document.getElementById('v-spo2').value = 99;
+        // Show confirmation dialog
+        const confirmed = confirm('Add wearable data? This will populate vital signs with mock data for demonstration purposes.');
+        if (!confirmed) return;
 
-        // Update state
-        state.vitals = { hr: 62, hrv: 58, bp: "118/76", spo2: 99 };
+        showToast('Syncing wearable data...', 'info');
+        
+        // Mock realistic data with confirmation
+        const mockVitals = {
+            hr: 62 + Math.random() * 8,
+            hrv: 38 + Math.random() * 12,
+            bp: `${115 + Math.floor(Math.random() * 15)}/${75 + Math.floor(Math.random() * 10)}`,
+            spo2: 96 + Math.random() * 3
+        };
 
-        // Trigger input events to save state
-        ['v-hr', 'v-hrv', 'v-bp', 'v-spo2'].forEach(id => {
-            document.getElementById(id).dispatchEvent(new Event('input', { bubbles: true }));
-        });
-
+        // Store mock data
+        state.vitals = mockVitals;
         saveState();
+        
+        // Update vitals display
+        updateVitalsDisplay();
+        
+        setTimeout(() => {
+            showToast('Wearable data synchronized successfully!', 'success');
+        }, 2000);
+    });
         showToast('Mock vitals data synced from Oura/Apple Health', 'success');
     });
 
@@ -629,10 +690,11 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('soap-footer-provider').innerText = state.patient.provider || 'Andre Bezerra, APRN';
 
             // 2. Populate Clinical Sections
+            document.getElementById('soap-objective').innerText = "Patient will present for comprehensive evaluation and discussion of advanced health optimization strategies including cardiovascular risk reduction, metabolic enhancement protocols, and personalized supplement regimens.";
+            document.getElementById('soap-subjective').innerText = "Patient reports recent laboratory work showing suboptimal biomarkers and seeks comprehensive evaluation for preventive health optimization.";
             document.getElementById('soap-complaint').innerText = state.history.complaint || "Routine review of medical records.";
-
             const hpiText = document.getElementById('doctor-note').value;
-            document.getElementById('soap-hpi').innerText = hpiText || "Patient presents for a comprehensive review of laboratory results. Reports no acute complaints at this time. Denies fatigue, polyuria, polydipsia, weight changes, chest pain, shortness of breath, or abdominal pain.";
+            document.getElementById('soap-hpi').innerText = hpiText || "Patient presents for comprehensive evaluation of advanced preventive health strategies and biomarker optimization.";
 
             document.getElementById('soap-medical-hx').innerText = state.history.medical || "1. HLH\n2. High Cholesterol\n3. HTN\n4. GERD\n5. Constipation\n6. Hearing Loss\n7. OA\n8. Anxiety";
             document.getElementById('soap-surgical-hx').innerText = state.history.surgical || "1. Eye Surgery\n2. Excision of skin cancer\n3. Cholecystectomy\n4. R. Knee Replacement (2018)\n5. Carotid endarterectomy";
