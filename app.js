@@ -503,6 +503,11 @@ document.addEventListener('DOMContentLoaded', () => {
         recognition.onstart = () => {
             startVoiceBtn.classList.add('recording');
             voiceStatus.innerText = 'Listening...';
+            const voiceIndicator = document.getElementById('voice-indicator');
+            if (voiceIndicator) {
+                voiceIndicator.style.display = 'flex';
+                voiceIndicator.classList.add('active');
+            }
         };
 
         recognition.onresult = (event) => {
@@ -510,6 +515,13 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 transcript += event.results[i][0].transcript;
             }
+            
+            // Check for voice commands first
+            if (handleVoiceCommand(transcript.toLowerCase())) {
+                return; // Command handled, don't add to text
+            }
+            
+            // If no command, add to dictation
             doctorNoteArea.value += transcript;
         };
 
@@ -521,11 +533,144 @@ document.addEventListener('DOMContentLoaded', () => {
         recognition.onend = () => {
             startVoiceBtn.classList.remove('recording');
             voiceStatus.innerText = 'Idle';
+            const voiceIndicator = document.getElementById('voice-indicator');
+            if (voiceIndicator) {
+                voiceIndicator.style.display = 'none';
+                voiceIndicator.classList.remove('active');
+            }
         };
     }
 
     function stopVoice() {
         if (recognition) recognition.stop();
+    }
+
+    // --- Voice Commands System ---
+    function handleVoiceCommand(command) {
+        // Navigation Commands
+        if (command.includes('go to dashboard') || command.includes('open dashboard')) {
+            switchView('dashboard');
+            showToast('Navigated to Dashboard', 'success');
+            return true;
+        }
+        
+        if (command.includes('go to upload') || command.includes('open upload')) {
+            switchView('upload');
+            showToast('Navigated to Upload', 'success');
+            return true;
+        }
+        
+        if (command.includes('go to soap') || command.includes('open soap') || command.includes('generate soap')) {
+            switchView('soap');
+            generateSOAP();
+            showToast('Generated SOAP Note', 'success');
+            return true;
+        }
+
+        // Action Commands
+        if (command.includes('save patient') || command.includes('save data')) {
+            savePatient();
+            showToast('Patient Saved', 'success');
+            return true;
+        }
+        
+        if (command.includes('clear data') || command.includes('clear all')) {
+            if (confirm('Clear all patient data?')) {
+                clearAllData();
+                showToast('Data Cleared', 'info');
+            }
+            return true;
+        }
+        
+        if (command.includes('create new patient') || command.includes('new patient')) {
+            if (confirm('Create new patient record? This will clear current data.')) {
+                createNewPatient();
+                showToast('New Patient Created', 'success');
+            }
+            return true;
+        }
+
+        // Chat Commands
+        if (command.includes('open chat') || command.includes('start chat')) {
+            const chatPanel = document.getElementById('chat-panel');
+            const chatToggle = document.getElementById('chat-toggle');
+            if (chatPanel) {
+                chatPanel.style.display = 'flex';
+                if (chatToggle) chatToggle.style.display = 'none';
+                showToast('Chat Opened - Say "ask" followed by your question', 'success');
+            }
+            return true;
+        }
+        
+        if (command.includes('close chat')) {
+            const chatPanel = document.getElementById('chat-panel');
+            const chatToggle = document.getElementById('chat-toggle');
+            if (chatPanel) {
+                chatPanel.style.display = 'none';
+                if (chatToggle) chatToggle.style.display = 'block';
+                showToast('Chat Closed', 'info');
+            }
+            return true;
+        }
+
+        // Voice Chat Query
+        if (command.startsWith('ask ')) {
+            const query = command.substring(4); // Remove "ask "
+            const chatPanel = document.getElementById('chat-panel');
+            const chatToggle = document.getElementById('chat-toggle');
+            
+            // Open chat if closed
+            if (chatPanel && chatPanel.style.display !== 'flex') {
+                chatPanel.style.display = 'flex';
+                if (chatToggle) chatToggle.style.display = 'none';
+            }
+            
+            // Send the query
+            setTimeout(() => {
+                const chatInput = document.getElementById('chat-input');
+                const sendBtn = document.getElementById('send-chat');
+                if (chatInput && sendBtn) {
+                    chatInput.value = query;
+                    sendBtn.click();
+                }
+            }, 500);
+            
+            showToast(`Asking: ${query}`, 'info');
+            return true;
+        }
+
+        // Help Command
+        if (command.includes('help') || command.includes('what can i say')) {
+            const helpText = `Voice Commands:
+• Navigation: "Go to dashboard/upload/soap"
+• Actions: "Save patient", "Clear data", "Create new patient"
+• Chat: "Open chat", "Close chat"
+• SOAP: "Generate SOAP"
+• Help: "Help" or "What can I say"`;
+            alert(helpText);
+            return true;
+        }
+
+        return false; // No command recognized
+    }
+
+    function switchView(viewName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('data-view') === viewName) {
+                btn.classList.add('active');
+            }
+        });
+        
+        // Update content views
+        document.querySelectorAll('.view-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        const targetView = document.getElementById(`view-${viewName}`);
+        if (targetView) {
+            targetView.classList.add('active');
+        }
     }
 
     startVoiceBtn.addEventListener('click', () => {
@@ -598,6 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const typingId = 'typing-' + Date.now();
         addChatMessage('bot typing', 'Med-Consult AI is analyzing...', typingId);
 
+        // Try API first, fall back to local knowledge for static deployment
         try {
             const context = state.rawText;
             const res = await fetch('/api/chat', {
@@ -625,13 +771,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || `Server error: ${res.status}`);
             }
         } catch (error) {
-            console.error('Chat Error:', error);
+            console.log('API not available, using local knowledge base:', error.message);
             const typingMsg = document.getElementById(typingId);
             if (typingMsg) typingMsg.remove();
 
             // Fallback to local knowledge
             const response = getMedicalResponse(query);
-            addChatMessage('bot', response + "\n\n(Note: Using local knowledge base due to connectivity)");
+            addChatMessage('bot', response + "\n\n(Note: Using local knowledge base - API not configured)");
         }
     }
 

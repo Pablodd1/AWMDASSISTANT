@@ -37,6 +37,7 @@
                     <button class="tab-btn" data-view="dashboard" id="nav-dashboard">Dashboard</button>
                     <button class="tab-btn" data-view="soap" id="nav-soap">SOAP Note</button>
                 </div>
+                <div id="voice-indicator" class="voice-indicator" style="display: none;" title="Voice Active">🎤</div>
                 <button id="theme-toggle" class="icon-btn" title="Toggle Theme">🌗</button>
             </div>
         </header>
@@ -120,8 +121,9 @@
                             <label>History of Present Illness (HPI)</label>
                             <div class="voice-controls">
                                 <button class="btn-icon-pulse" id="start-voice"
-                                    title="Start Voice Dictation">🎤</button>
+                                    title="Start Voice Dictation & Commands">🎤</button>
                                 <span id="voice-status" class="status-indicator">Idle</span>
+                                <button class="btn-sm" onclick="alert('Voice Commands:\n• Navigation: \"Go to dashboard/upload/soap\"\n• Actions: \"Save patient\", \"Clear data\", \"Create new patient\"\n• Chat: \"Open chat\", \"Close chat\"\n• SOAP: \"Generate SOAP\"\n• Help: \"Help\" or \"What can I say\"')" title="Voice Commands Help">❓</button>
                             </div>
                             <textarea id="doctor-note" placeholder=""></textarea>
                         </div>
