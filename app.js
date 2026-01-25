@@ -384,43 +384,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    syncWearablesBtn.addEventListener('click', () => {
-        // Only sync if vitals are empty or user confirms
-        const currentVitals = state.vitals || { hr: 0, hrv: 0, bp: '', spo2: 0 };
-        const hasExistingData = currentVitals.hr > 0 || currentVitals.hrv > 0;
-        
-        if (!hasExistingData) {
-            showToast('No existing wearable data to overwrite. Enter vitals manually.', 'warning');
-            return;
-        }
+    // Special handling for sex dropdown (uses 'change' event instead of 'input')
+    const sexDropdown = document.getElementById('p-sex');
+    if (sexDropdown) {
+        sexDropdown.addEventListener('change', () => {
+            state.patient.sex = sexDropdown.value;
+            saveState();
+        });
+    }
 
-        // Show confirmation dialog
-        const confirmed = confirm('Add wearable data? This will populate vital signs with mock data for demonstration purposes.');
-        if (!confirmed) return;
+    // Sync Wearables Button - Only add listener if button exists
+    if (syncWearablesBtn) {
+        syncWearablesBtn.addEventListener('click', () => {
+            // Show confirmation dialog
+            const confirmed = confirm('Add wearable data? This will populate vital signs with mock data for demonstration purposes.');
+            if (!confirmed) return;
 
-        showToast('Syncing wearable data...', 'info');
-        
-        // Mock realistic data with confirmation
-        const mockVitals = {
-            hr: 62 + Math.random() * 8,
-            hrv: 38 + Math.random() * 12,
-            bp: `${115 + Math.floor(Math.random() * 15)}/${75 + Math.floor(Math.random() * 10)}`,
-            spo2: 96 + Math.random() * 3
-        };
+            showToast('Syncing wearable data...', 'info');
+            
+            // Mock realistic data with confirmation
+            const mockVitals = {
+                hr: Math.round(62 + Math.random() * 8),
+                hrv: Math.round(38 + Math.random() * 12),
+                bp: `${115 + Math.floor(Math.random() * 15)}/${75 + Math.floor(Math.random() * 10)}`,
+                spo2: Math.round(96 + Math.random() * 3)
+            };
 
-        // Store mock data
-        state.vitals = mockVitals;
-        saveState();
-        
-        // Update vitals display
-        updateVitalsDisplay();
-        
-        setTimeout(() => {
-            showToast('Wearable data synchronized successfully!', 'success');
-        }, 2000);
-    });
-        showToast('Mock vitals data synced from Oura/Apple Health', 'success');
-    });
+            // Store mock data
+            state.vitals = mockVitals;
+            
+            // Update vitals display
+            updateVitalsDisplay();
+            
+            saveState();
+            
+            setTimeout(() => {
+                showToast('Wearable data synchronized successfully!', 'success');
+            }, 1000);
+        });
+    }
 
     // Save Patient Button - Explicit save with validation
     if (savePatientBtn) {
@@ -722,6 +724,133 @@ document.addEventListener('DOMContentLoaded', () => {
         return flags;
     }
 
+    // --- Helper Functions for Voice Commands and UI ---
+    function savePatient() {
+        // Validate required fields
+        const flags = checkDataIntegrity();
+
+        if (flags.length > 0) {
+            const proceed = confirm(`⚠️ Warning: Missing data detected:\n\n${flags.join('\n')}\n\nDo you want to save anyway?`);
+            if (!proceed) return;
+        }
+
+        // Save state
+        saveState();
+
+        // Show success message
+        showToast(`✓ Patient record saved: ${state.patient.name || 'Unnamed Patient'}`, 'success');
+    }
+
+    function clearAllData() {
+        localStorage.removeItem('mediDocState');
+        location.reload();
+    }
+
+    function createNewPatient() {
+        // Clear all patient data
+        state = {
+            rawText: '',
+            patient: { name: '', dob: '', age: '', sex: '', chart: 'AW-7742', provider: 'Andre Bezerra, APRN' },
+            history: {
+                medical: '',
+                surgical: '',
+                family: '',
+                social: '',
+                allergies: '',
+                complaint: ''
+            },
+            entities: [],
+            labs: {},
+            vitals: { hr: 0, hrv: 0, bp: '', spo2: 0 },
+            codes: [
+                { code: 'Z00.00', desc: 'Encounter for general adult medical examination', justification: 'Standard baseline assessment code.' }
+            ],
+            analysis: null
+        };
+        
+        // Clear form fields
+        ['p-name', 'p-dob', 'p-age', 'p-sex', 'p-provider', 'p-chart', 'p-complaint', 'doctor-note',
+         'v-hr', 'v-hrv', 'v-bp', 'v-spo2',
+         'h-medical', 'h-surgical', 'h-family', 'h-social', 'h-allergies'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        
+        // Clear extracted text
+        const extractedText = document.getElementById('extracted-text');
+        if (extractedText) extractedText.innerHTML = '';
+        
+        saveState();
+    }
+
+    function updateVitalsDisplay() {
+        // Update vitals input fields from state
+        const vHR = document.getElementById('v-hr');
+        const vHRV = document.getElementById('v-hrv');
+        const vBP = document.getElementById('v-bp');
+        const vSPO2 = document.getElementById('v-spo2');
+
+        if (vHR) vHR.value = state.vitals.hr || '';
+        if (vHRV) vHRV.value = state.vitals.hrv || '';
+        if (vBP) vBP.value = state.vitals.bp || '';
+        if (vSPO2) vSPO2.value = state.vitals.spo2 || '';
+    }
+
+    // --- Vitals Analysis for Red Flags ---
+    function analyzeVitalsForRedFlags(vitals) {
+        const flags = [];
+        
+        if (!vitals) return flags;
+
+        // Heart Rate Analysis
+        if (vitals.hr) {
+            if (vitals.hr < 50) {
+                flags.push(`Bradycardia detected: HR ${vitals.hr} bpm (< 50 bpm) - Consider cardiac evaluation`);
+            } else if (vitals.hr > 100) {
+                flags.push(`Tachycardia detected: HR ${vitals.hr} bpm (> 100 bpm) - Assess for anxiety, fever, dehydration, or cardiac etiology`);
+            }
+        }
+
+        // HRV Analysis
+        if (vitals.hrv) {
+            if (vitals.hrv < 20) {
+                flags.push(`Severely low HRV: ${vitals.hrv} ms - High autonomic stress, consider comprehensive stress/inflammation workup`);
+            } else if (vitals.hrv < 40) {
+                flags.push(`Low HRV: ${vitals.hrv} ms - Indicates autonomic dysfunction or chronic stress`);
+            }
+        }
+
+        // Blood Pressure Analysis
+        if (vitals.bp) {
+            const bpParts = vitals.bp.split('/');
+            if (bpParts.length === 2) {
+                const systolic = parseInt(bpParts[0]);
+                const diastolic = parseInt(bpParts[1]);
+                
+                if (systolic >= 180 || diastolic >= 120) {
+                    flags.push(`Hypertensive Crisis: BP ${vitals.bp} mmHg - URGENT: Immediate evaluation required`);
+                } else if (systolic >= 140 || diastolic >= 90) {
+                    flags.push(`Stage 2 Hypertension: BP ${vitals.bp} mmHg - Lifestyle modification + pharmacotherapy indicated`);
+                } else if (systolic >= 130 || diastolic >= 80) {
+                    flags.push(`Stage 1 Hypertension: BP ${vitals.bp} mmHg - Lifestyle modification recommended`);
+                } else if (systolic < 90 || diastolic < 60) {
+                    flags.push(`Hypotension: BP ${vitals.bp} mmHg - Assess for dehydration, medication effects, or underlying condition`);
+                }
+            }
+        }
+
+        // SpO2 Analysis
+        if (vitals.spo2) {
+            if (vitals.spo2 < 90) {
+                flags.push(`Severe Hypoxemia: SpO2 ${vitals.spo2}% (< 90%) - URGENT: Supplemental oxygen and immediate evaluation`);
+            } else if (vitals.spo2 < 94) {
+                flags.push(`Hypoxemia: SpO2 ${vitals.spo2}% (< 94%) - Consider pulmonary evaluation and sleep study`);
+            }
+        }
+
+        return flags;
+    }
+
     // --- Medical Chatbot (Med-Consult AI) ---
     chatToggle.addEventListener('click', () => {
         chatPanel.style.display = chatPanel.style.display === 'none' ? 'flex' : 'none';
@@ -848,7 +977,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('soap-social-hx').innerText = state.history.social || "Denies tobacco/illicit drug use.";
 
             // Dynamic Smoking Status based on Social Hx or explicit field
-            const social = state.history.social.toLowerCase();
+            const social = (state.history.social || '').toLowerCase();
             let smokingStatus = "Never Smoker";
             if (social.includes('smoke') || social.includes('tobacco')) smokingStatus = "Current Smoker / Tobacco User";
             if (social.includes('former') || social.includes('quit')) smokingStatus = "Former Smoker";
